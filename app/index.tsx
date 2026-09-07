@@ -1,20 +1,66 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { View, FlatList, StyleSheet, StatusBar, ActivityIndicator } from 'react-native';
+import { useRouter } from 'expo-router';
 import { Colors } from '@/constants/theme';
 import { PlayerStatusHeader } from '@/components/system/PlayerStatusHeader';
 import { QuestCard } from '@/components/system/QuestCard';
 import { QuestFilterTabs } from '@/components/system/QuestFilterTabs';
 import { SystemActionFAB } from '@/components/system/SystemActionFAB';
-import { CreateQuestModal, NewQuestPayload } from '@/components/system/CreateQuestModal';
+import { CreateQuestModal} from '@/components/system/CreateQuestModal';
+
 import { useQuestStore } from '@/stores/useQuestStore';
+import { usePlayerStore } from '@/stores/usePlayerStore';
+
+import { initDatabase } from '@/db/client';
 
 export default function HomeScreen() {
-    const { quests, playerStats, activeTab, isLoading, init, setActiveTab, addQuest, toggleQuest } = useQuestStore();
+    const router = useRouter();
+
+    const quests = useQuestStore((state) => state.quests);
+    const activeTab = useQuestStore((state) => state.activeTab);
+    const isQuestsLoading = useQuestStore((state) => state.isLoading);
+    const initQuests = useQuestStore((state) => state.initQuests);
+    const setActiveTab = useQuestStore((state) => state.setActiveTab);
+    const addQuest = useQuestStore((state) => state.addQuest);
+    const toggleQuest = useQuestStore((state) => state.toggleQuest);
+
+    const playerStats = usePlayerStore((state) => state.playerStats);
+    const isPlayerLoading = usePlayerStore((state) => state.isLoading);
+    const initPlayer = usePlayerStore((state) => state.initPlayer);
+    const applyXpChange = usePlayerStore((state) => state.applyXpChange);
+
     const [isModalVisible, setIsModalVisible] = useState(false);
 
     useEffect(() => {
-        init();
+        const bootstrap = async () => {
+            try {
+                await initDatabase();
+
+                await Promise.all([
+                    initQuests(),
+                    initPlayer(),
+                ]);
+            } catch (e) {
+                console.error('Bootstrap error:', e);
+            }
+        };
+
+        bootstrap();
     }, []);
+
+    useEffect(() => {
+        if (!isPlayerLoading && playerStats && !playerStats.isRegistered) {
+            router.replace('/register');
+        }
+    }, [isPlayerLoading, playerStats]);
+
+    const handleToggleQuest = async (id: string) => {
+        const updated = await toggleQuest(id);
+        if (updated) {
+            const diff = updated.isCompleted ? updated.xpReward : -updated.xpReward;
+            await applyXpChange(diff);
+        }
+    };
 
     const counts = useMemo(() => {
         const calc = (type: 'daily' | 'main' | 'regular') => {
@@ -35,11 +81,7 @@ export default function HomeScreen() {
         return quests.filter((q) => q.type === activeTab);
     }, [quests, activeTab]);
 
-    const handleCreateQuest = async (payload: NewQuestPayload) => {
-        await addQuest(payload);
-    };
-
-    if (isLoading || !playerStats) {
+    if (isQuestsLoading || isPlayerLoading || !playerStats) {
         return (
             <View style={[styles.container, styles.centered]}>
                 <ActivityIndicator size="large" color={Colors.neonBlue} />
@@ -71,7 +113,7 @@ export default function HomeScreen() {
                 data={filteredQuests}
                 keyExtractor={(item) => item.id}
                 renderItem={({ item }) => (
-                    <QuestCard quest={item} onToggle={toggleQuest} />
+                    <QuestCard quest={item} onToggle={handleToggleQuest} />
                 )}
                 contentContainerStyle={styles.listContent}
                 showsVerticalScrollIndicator={false}
@@ -82,7 +124,7 @@ export default function HomeScreen() {
             <CreateQuestModal
                 visible={isModalVisible}
                 onClose={() => setIsModalVisible(false)}
-                onSubmit={handleCreateQuest}
+                onSubmit={addQuest}
             />
         </View>
     );

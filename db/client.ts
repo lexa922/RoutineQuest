@@ -18,29 +18,32 @@ export const initDatabase = async () => {
     await db.execAsync('PRAGMA journal_mode = WAL;');
 
     await db.execAsync(`
-    CREATE TABLE IF NOT EXISTS quests (
-      id TEXT PRIMARY KEY NOT NULL,
-      title TEXT NOT NULL,
-      category TEXT NOT NULL,
-      type TEXT NOT NULL,
-      xp_reward INTEGER NOT NULL,
-      is_completed INTEGER DEFAULT 0,
-      created_at TEXT NOT NULL
-    );
-  `);
+        CREATE TABLE IF NOT EXISTS quests (
+        id TEXT PRIMARY KEY NOT NULL,
+        title TEXT NOT NULL,
+        category TEXT NOT NULL,
+        type TEXT NOT NULL,
+        xp_reward INTEGER NOT NULL,
+        is_completed INTEGER DEFAULT 0,
+        created_at TEXT NOT NULL
+        );
+    `);
 
     await db.execAsync(`
-    CREATE TABLE IF NOT EXISTS player_stats (
-      id INTEGER PRIMARY KEY CHECK (id = 1),
-      level INTEGER DEFAULT 1,
-      rank TEXT DEFAULT 'E-Rank',
-      current_xp INTEGER DEFAULT 0,
-      max_xp INTEGER DEFAULT 1000,
-      hp_percentage INTEGER DEFAULT 100,
-      streak_days INTEGER DEFAULT 0,
-      has_penalty INTEGER DEFAULT 0
-    );
-  `);
+        CREATE TABLE IF NOT EXISTS player_stats (
+                                                    id INTEGER PRIMARY KEY CHECK (id = 1),
+            nickname TEXT DEFAULT 'Hunter',
+            player_class TEXT DEFAULT 'Shadow Striker',
+            level INTEGER DEFAULT 1,
+            rank TEXT DEFAULT 'E-Rank',
+            current_xp INTEGER DEFAULT 0,
+            max_xp INTEGER DEFAULT 1000,
+            hp_percentage INTEGER DEFAULT 100,
+            streak_days INTEGER DEFAULT 0,
+            has_penalty INTEGER DEFAULT 0,
+            is_registered INTEGER DEFAULT 0
+            );
+    `);
 };
 
 export const fetchQuestsFromDB = async (): Promise<Quest[]> => {
@@ -94,6 +97,8 @@ export const updateQuestCompletionDB = async (id: string, isCompleted: boolean) 
 export const fetchPlayerStatsFromDB = async (): Promise<PlayerStats> => {
     const db = await getDB();
     const row = await db.getFirstAsync<{
+        nickname: string;
+        player_class: string;
         level: number;
         rank: string;
         current_xp: number;
@@ -101,10 +106,13 @@ export const fetchPlayerStatsFromDB = async (): Promise<PlayerStats> => {
         hp_percentage: number;
         streak_days: number;
         has_penalty: number;
+        is_registered: number;
     }>('SELECT * FROM player_stats WHERE id = 1;');
 
     if (!row) {
         return {
+            nickname: 'Hunter',
+            playerClass: 'Novice',
             level: 1,
             rank: 'E-Rank',
             currentXp: 0,
@@ -112,10 +120,13 @@ export const fetchPlayerStatsFromDB = async (): Promise<PlayerStats> => {
             hpPercentage: 100,
             streakDays: 0,
             hasPenalty: false,
+            isRegistered: false,
         };
     }
 
     return {
+        nickname: row.nickname,
+        playerClass: row.player_class,
         level: row.level,
         rank: row.rank,
         currentXp: row.current_xp,
@@ -123,6 +134,7 @@ export const fetchPlayerStatsFromDB = async (): Promise<PlayerStats> => {
         hpPercentage: row.hp_percentage,
         streakDays: row.streak_days,
         hasPenalty: Boolean(row.has_penalty),
+        isRegistered: Boolean(row.is_registered),
     };
 };
 
@@ -131,5 +143,17 @@ export const updatePlayerXpDB = async (newXp: number, level: number, maxXp: numb
     await db.runAsync(
         'UPDATE player_stats SET current_xp = ?, level = ?, max_xp = ? WHERE id = 1;',
         [newXp, level, maxXp]
+    );
+};
+
+export const registerPlayerDB = async (nickname: string, playerClass: string) => {
+    const db = await getDB();
+    await db.runAsync(
+        `INSERT OR REPLACE INTO player_stats (
+      id, nickname, player_class, level, rank, current_xp, max_xp, hp_percentage, streak_days, has_penalty, is_registered
+    ) VALUES (
+      1, ?, ?, 1, 'E-Rank', 0, 1000, 100, 1, 0, 1
+    );`,
+        [nickname, playerClass]
     );
 };

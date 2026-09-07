@@ -12,6 +12,9 @@ export interface Quest {
 }
 
 export interface PlayerStats {
+    id?: number;
+    nickname: string;
+    playerClass: string;
     level: number;
     rank: string;
     currentXp: number;
@@ -19,4 +22,5 @@ export interface PlayerStats {
     hpPercentage: number;
     streakDays: number;
     hasPenalty: boolean;
+    isRegistered?: boolean;
 }

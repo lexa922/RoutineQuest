@@ -1,40 +1,39 @@
 import { create } from 'zustand';
-import { Quest, PlayerStats, TabType, QuestCategory } from '@/types/quest';
+import { Quest, TabType, QuestCategory } from '@/types/quest';
 import {
     initDatabase,
     fetchQuestsFromDB,
     insertQuestToDB,
     updateQuestCompletionDB,
-    fetchPlayerStatsFromDB,
-    updatePlayerXpDB,
 } from '@/db/client';
 
 interface QuestState {
     quests: Quest[];
-    playerStats: PlayerStats | null;
     activeTab: TabType;
     isLoading: boolean;
 
-    init: () => Promise<void>;
+    initQuests: () => Promise<void>;
     setActiveTab: (tab: TabType) => void;
-    addQuest: (payload: { title: string; category: QuestCategory; type: TabType; xpReward: number }) => Promise<void>;
-    toggleQuest: (id: string) => Promise<void>;
+    addQuest: (payload: {
+        title: string;
+        category: QuestCategory;
+        type: TabType;
+        xpReward: number;
+    }) => Promise<void>;
+    toggleQuest: (id: string) => Promise<Quest | null>;
 }
 
 export const useQuestStore = create<QuestState>((set, get) => ({
     quests: [],
-    playerStats: null,
     activeTab: 'daily',
     isLoading: true,
 
-    init: async () => {
+    initQuests: async () => {
         try {
-            await initDatabase();
             const quests = await fetchQuestsFromDB();
-            const playerStats = await fetchPlayerStatsFromDB();
-            set({ quests, playerStats, isLoading: false });
-        } catch (e) {
-            console.error('Database init error:', e);
+            set({ quests, isLoading: false });
+        } catch (error) {
+            console.error('QuestStore init error:', error);
             set({ isLoading: false });
         }
     },
@@ -61,42 +60,18 @@ export const useQuestStore = create<QuestState>((set, get) => ({
     },
 
     toggleQuest: async (id: string) => {
-        const { quests, playerStats } = get();
-        const targetQuest = quests.find((q) => q.id === id);
-        if (!targetQuest || !playerStats) return;
+        const { quests } = get();
+        const target = quests.find((q) => q.id === id);
+        if (!target) return null;
 
-        const nextCompleted = !targetQuest.isCompleted;
-        const xpDiff = nextCompleted ? targetQuest.xpReward : -targetQuest.xpReward;
-
-        let nextXp = playerStats.currentXp + xpDiff;
-        let nextLevel = playerStats.level;
-        let nextMaxXp = playerStats.maxXp;
-
-        if (nextXp >= nextMaxXp) {
-            nextXp -= nextMaxXp;
-            nextLevel += 1;
-            nextMaxXp = Math.round(nextMaxXp * 1.25);
-        } else if (nextXp < 0 && nextLevel > 1) {
-            nextLevel -= 1;
-            nextMaxXp = Math.round(nextMaxXp / 1.25);
-            nextXp = nextMaxXp + nextXp;
-        }
-
-        const updatedStats: PlayerStats = {
-            ...playerStats,
-            currentXp: Math.max(0, nextXp),
-            level: nextLevel,
-            maxXp: nextMaxXp,
-        };
+        const nextCompleted = !target.isCompleted;
+        const updatedQuest = { ...target, isCompleted: nextCompleted };
 
         set((state) => ({
-            quests: state.quests.map((q) => (q.id === id ? { ...q, isCompleted: nextCompleted } : q)),
-            playerStats: updatedStats,
+            quests: state.quests.map((q) => (q.id === id ? updatedQuest : q)),
         }));
 
-        await Promise.all([
-            updateQuestCompletionDB(id, nextCompleted),
-            updatePlayerXpDB(updatedStats.currentXp, updatedStats.level, updatedStats.maxXp),
-        ]);
+        await updateQuestCompletionDB(id, nextCompleted);
+        return updatedQuest;
     },
 }));
