@@ -7,9 +7,11 @@ import Animated, {
     Easing
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Colors } from '../../constants/theme';
+import { Colors } from '@/constants/theme';
 
 interface PlayerStatusProps {
+    nickname: string;
+    playerClass: string;
     level: number;
     rank: string;
     currentXp: number;
@@ -20,14 +22,16 @@ interface PlayerStatusProps {
 }
 
 export const PlayerStatusHeader: React.FC<PlayerStatusProps> = ({
-                                                                    level,
-                                                                    rank,
-                                                                    currentXp,
-                                                                    maxXp,
-                                                                    hpPercentage,
-                                                                    streakDays,
-                                                                    hasPenalty,
-                                                                }) => {
+    nickname,
+    playerClass,
+    level,
+    rank,
+    currentXp,
+    maxXp,
+    hpPercentage,
+    streakDays,
+    hasPenalty,
+    }) => {
     const xpWidth = useSharedValue(0);
 
     useEffect(() => {
@@ -44,13 +48,25 @@ export const PlayerStatusHeader: React.FC<PlayerStatusProps> = ({
 
     return (
         <View style={styles.headerWrapper}>
+            {/* Верхній рядок: Позивний гравця та клас */}
+            <View style={styles.identityRow}>
+                <View style={styles.callsignBlock}>
+                    <Text style={styles.callsignPrefix}>OPERATOR // </Text>
+                    <Text style={styles.nicknameText}>{nickname.toUpperCase()}</Text>
+                </View>
+                <Text style={styles.classBadge}>[{playerClass.toUpperCase()}]</Text>
+            </View>
+
             <View style={styles.topRow}>
+                {/* Аватар / Ранг */}
                 <View style={styles.rankBadge}>
                     <Text style={styles.rankText}>[{rank}]</Text>
                     <Text style={styles.levelText}>LVL {level}</Text>
                 </View>
 
+                {/* Метрики стану */}
                 <View style={styles.barsContainer}>
+                    {/* HP Bar */}
                     <View style={styles.barBlock}>
                         <View style={styles.barLabelRow}>
                             <Text style={styles.barLabel}>DISCIPLINE (HP)</Text>
@@ -66,6 +82,7 @@ export const PlayerStatusHeader: React.FC<PlayerStatusProps> = ({
                         </View>
                     </View>
 
+                    {/* XP Bar */}
                     <View style={styles.barBlock}>
                         <View style={styles.barLabelRow}>
                             <Text style={[styles.barLabel, { color: Colors.neonBlue }]}>
@@ -81,12 +98,14 @@ export const PlayerStatusHeader: React.FC<PlayerStatusProps> = ({
                     </View>
                 </View>
 
+                {/* Streak Counter */}
                 <View style={styles.streakBadge}>
                     <Text style={styles.flameIcon}>▲</Text>
                     <Text style={styles.streakCount}>{streakDays}D</Text>
                 </View>
             </View>
 
+            {/* Зона тривоги / Бафів */}
             {hasPenalty && (
                 <View style={styles.penaltyAlert}>
                     <LinearGradient
@@ -106,12 +125,44 @@ export const PlayerStatusHeader: React.FC<PlayerStatusProps> = ({
 
 const styles = StyleSheet.create({
     headerWrapper: {
-        paddingTop: 48,
+        paddingTop: 46,
         paddingHorizontal: 16,
         paddingBottom: 12,
         backgroundColor: Colors.bgPrimary,
         borderBottomWidth: 1,
         borderBottomColor: Colors.borderCard,
+    },
+    identityRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 8,
+        paddingBottom: 6,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(30, 38, 56, 0.5)',
+    },
+    callsignBlock: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    callsignPrefix: {
+        color: Colors.textMuted,
+        fontSize: 10,
+        fontFamily: 'monospace',
+        letterSpacing: 1,
+    },
+    nicknameText: {
+        color: Colors.textWhite,
+        fontSize: 12,
+        fontFamily: 'monospace',
+        fontWeight: '800',
+        letterSpacing: 1.2,
+    },
+    classBadge: {
+        color: Colors.neonBlue,
+        fontSize: 9,
+        fontFamily: 'monospace',
+        letterSpacing: 1,
     },
     topRow: {
         flexDirection: 'row',
@@ -193,7 +244,7 @@ const styles = StyleSheet.create({
         fontFamily: 'monospace',
     },
     penaltyAlert: {
-        marginTop: 12,
+        marginTop: 10,
         paddingVertical: 6,
         paddingHorizontal: 10,
         borderLeftWidth: 3,

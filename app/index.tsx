@@ -94,6 +94,8 @@ export default function HomeScreen() {
             <StatusBar barStyle="light-content" backgroundColor={Colors.bgPrimary} />
 
             <PlayerStatusHeader
+                nickname={playerStats.nickname}
+                playerClass={playerStats.playerClass}
                 level={playerStats.level}
                 rank={playerStats.rank}
                 currentXp={playerStats.currentXp}
