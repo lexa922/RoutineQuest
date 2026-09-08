@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Quest, TabType, QuestCategory } from '@/types/quest';
+import { Quest, TabType, QuestCategory, RepeatType } from '@/types/quest';
 import {
     fetchQuestsFromDB,
     insertQuestToDB,
@@ -34,27 +34,37 @@ export const useQuestStore = create<QuestState>((set, get) => ({
             const quests = await fetchQuestsFromDB();
             set({ quests, isLoading: false });
         } catch (error) {
-            console.error('QuestStore init error:', error);
             set({ isLoading: false });
         }
     },
 
     setActiveTab: (tab) => set({ activeTab: tab }),
 
-    addQuest: async ({ title, category, type, xpReward }) => {
+    addQuest: async (payload: {
+        title: string;
+        category: QuestCategory;
+        type: TabType;
+        xpReward: number;
+        repeatType?: RepeatType;
+        repeatIntervalDays?: number;
+        repeatWeekdays?: number[];
+    }) => {
         const newQuest: Quest = {
-            id: Date.now().toString(),
-            title,
-            category,
-            type,
-            xpReward,
+            id: String(Date.now()),
+            title: payload.title,
+            category: payload.category,
+            type: payload.type,
+            xpReward: payload.xpReward,
             isCompleted: false,
             createdAt: new Date().toISOString(),
+            repeatType: payload.repeatType,
+            repeatIntervalDays: payload.repeatIntervalDays,
+            repeatWeekdays: payload.repeatWeekdays,
         };
 
         set((state) => ({
             quests: [newQuest, ...state.quests],
-            activeTab: type,
+            activeTab: payload.type,
         }));
 
         await insertQuestToDB(newQuest);
@@ -66,13 +76,15 @@ export const useQuestStore = create<QuestState>((set, get) => ({
         if (!target) return null;
 
         const nextCompleted = !target.isCompleted;
-        const updatedQuest = { ...target, isCompleted: nextCompleted };
+        const nowIso = nextCompleted ? new Date().toISOString() : null;
+
+        const updatedQuest: Quest = { ...target, isCompleted: nextCompleted, lastCompletedAt: nowIso ?? target.lastCompletedAt };
 
         set((state) => ({
             quests: state.quests.map((q) => (q.id === id ? updatedQuest : q)),
         }));
 
-        await updateQuestCompletionDB(id, nextCompleted);
+        await updateQuestCompletionDB(id, nextCompleted, updatedQuest.lastCompletedAt);
         return updatedQuest;
     },
 }));

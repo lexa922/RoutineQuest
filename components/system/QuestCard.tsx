@@ -7,19 +7,26 @@ import Animated, {
     useSharedValue
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
-import { Colors } from '../../constants/theme';
+import { Colors } from '@/constants/theme';
+import { Quest } from '@/types/quest';
 
 interface QuestProps {
-    quest: {
-        id: string;
-        title: string;
-        category: 'STR' | 'INT' | 'MND';
-        xpReward: number;
-        cooldown?: string;
-        isCompleted: boolean;
-    };
+    quest: Quest;
     onToggle: (id: string) => void;
 }
+
+const getScheduleLabel = (quest: Quest): string | null => {
+    if (quest.type === 'regular') {
+        if (quest.repeatType === 'interval' && quest.repeatIntervalDays) {
+            return `КОЖНІ ${quest.repeatIntervalDays} ДН.`;
+        }
+        if (quest.repeatType === 'weekdays' && quest.repeatWeekdays && quest.repeatWeekdays.length > 0) {
+            const daysMap = ['', 'ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'НД'];
+            return quest.repeatWeekdays.map((d) => daysMap[d]).join('.');
+        }
+    }
+    return null;
+};
 
 export const QuestCard: React.FC<QuestProps> = ({ quest, onToggle }) => {
     const checkScale = useSharedValue(quest.isCompleted ? 1 : 0);
@@ -42,6 +49,8 @@ export const QuestCard: React.FC<QuestProps> = ({ quest, onToggle }) => {
         opacity: cardOpacity.value,
     }));
 
+    const scheduleLabel = getScheduleLabel(quest);
+
     return (
         <Animated.View style={[styles.cardContainer, animatedCardStyle]}>
             <Pressable onPress={handlePress} style={styles.cardContent}>
@@ -54,10 +63,11 @@ export const QuestCard: React.FC<QuestProps> = ({ quest, onToggle }) => {
                         <Text style={[styles.categoryTag, styles[`tag_${quest.category}`]]}>
                             [{quest.category}]
                         </Text>
-                        {quest.cooldown && (
-                            <Text style={styles.cooldownText}>RESET: {quest.cooldown}</Text>
+                        {scheduleLabel && (
+                            <Text style={styles.cooldownText}>RESET: {scheduleLabel}</Text>
                         )}
                     </View>
+
                     <Text
                         style={[styles.questTitle, quest.isCompleted && styles.completedTitle]}
                         numberOfLines={1}

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, {useEffect, useState, useMemo, useRef} from 'react';
 import { View, FlatList, StyleSheet, StatusBar, ActivityIndicator, AppState, AppStateStatus } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Colors } from '@/constants/theme';

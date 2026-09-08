@@ -1,5 +1,6 @@
 export type QuestCategory = 'STR' | 'INT' | 'MND';
 export type TabType = 'daily' | 'main' | 'regular';
+export type RepeatType = 'interval' | 'weekdays';
 
 export interface Quest {
     id: string;
@@ -9,6 +10,10 @@ export interface Quest {
     xpReward: number;
     isCompleted: boolean;
     createdAt: string;
+    repeatType?: RepeatType;
+    repeatIntervalDays?: number;
+    repeatWeekdays?: number[];
+    lastCompletedAt?: string | null;
 }
 
 export interface PlayerStats {

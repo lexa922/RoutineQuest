@@ -19,13 +19,17 @@ export const initDatabase = async () => {
 
     await db.execAsync(`
         CREATE TABLE IF NOT EXISTS quests (
-        id TEXT PRIMARY KEY NOT NULL,
-        title TEXT NOT NULL,
-        category TEXT NOT NULL,
-        type TEXT NOT NULL,
-        xp_reward INTEGER NOT NULL,
-        is_completed INTEGER DEFAULT 0,
-        created_at TEXT NOT NULL
+            id TEXT PRIMARY KEY NOT NULL,
+            title TEXT NOT NULL,
+            category TEXT NOT NULL,
+            type TEXT NOT NULL,
+            xp_reward INTEGER NOT NULL,
+            is_completed INTEGER DEFAULT 0,
+            created_at TEXT NOT NULL,
+            repeat_type TEXT,
+            repeat_interval_days INTEGER,
+            repeat_weekdays TEXT,
+            last_completed_at TEXT
         );
     `);
 
@@ -49,13 +53,27 @@ export const initDatabase = async () => {
 
 export const checkAndResetDailiesDB = async (): Promise<boolean> => {
     const db = await getDB();
-    const today = new Date().toISOString().split('T')[0]; // Рядок виду "YYYY-MM-DD"
+    const today = new Date().toISOString().split('T')[0];
 
     const player = await db.getFirstAsync<{ last_daily_reset: string | null }>(
         'SELECT last_daily_reset FROM player_stats WHERE id = 1;'
     );
 
-    if (!player) return false;
+    if (!player) {
+        await db.runAsync(`
+      INSERT OR IGNORE INTO player_stats (id, last_daily_reset)
+      VALUES (1, ?);
+    `, [today]);
+        return false;
+    }
+
+    if (!player.last_daily_reset) {
+        await db.runAsync(
+            'UPDATE player_stats SET last_daily_reset = ? WHERE id = 1;',
+            [today]
+        );
+        return false;
+    }
 
     if (player.last_daily_reset === today) {
         return false;
@@ -67,13 +85,53 @@ export const checkAndResetDailiesDB = async (): Promise<boolean> => {
     WHERE type = 'daily';
   `);
 
-    await db.runAsync(`
-    UPDATE player_stats 
-    SET last_daily_reset = ? 
-    WHERE id = 1;
-  `, [today]);
+    await checkAndResetRegularQuestsDB();
+
+    await db.runAsync(
+        'UPDATE player_stats SET last_daily_reset = ? WHERE id = 1;',
+        [today]
+    );
 
     return true;
+};
+
+export const checkAndResetRegularQuestsDB = async () => {
+    const db = await getDB();
+    const quests = await fetchQuestsFromDB();
+    const now = new Date();
+
+    const currentDayOfWeek = now.getDay() === 0 ? 7 : now.getDay();
+    const todayStr = now.toISOString().split('T')[0];
+
+    for (const q of quests) {
+        if (q.type !== 'regular' || !q.isCompleted) continue;
+
+        let shouldReset = false;
+
+        if (q.repeatType === 'weekdays' && q.repeatWeekdays && q.repeatWeekdays.length > 0) {
+            const isDayMatch = q.repeatWeekdays.includes(currentDayOfWeek);
+            const doneToday = q.lastCompletedAt?.startsWith(todayStr);
+
+            if (isDayMatch && !doneToday) {
+                shouldReset = true;
+            }
+        } else if (q.repeatType === 'interval' && q.repeatIntervalDays && q.lastCompletedAt) {
+            const lastDate = new Date(q.lastCompletedAt);
+            const diffTime = now.getTime() - lastDate.getTime();
+            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+            if (diffDays >= q.repeatIntervalDays) {
+                shouldReset = true;
+            }
+        }
+
+        if (shouldReset) {
+            await db.runAsync(
+                'UPDATE quests SET is_completed = 0 WHERE id = ?;',
+                [q.id]
+            );
+        }
+    }
 };
 
 export const fetchQuestsFromDB = async (): Promise<Quest[]> => {
@@ -86,6 +144,10 @@ export const fetchQuestsFromDB = async (): Promise<Quest[]> => {
         xp_reward: number;
         is_completed: number;
         created_at: string;
+        repeat_type: Quest['repeatType'];
+        repeat_interval_days: number | null;
+        repeat_weekdays: string | null;
+        last_completed_at: string | null;
     }>('SELECT * FROM quests ORDER BY created_at DESC;');
 
     return rows.map((r) => ({
@@ -96,14 +158,20 @@ export const fetchQuestsFromDB = async (): Promise<Quest[]> => {
         xpReward: r.xp_reward,
         isCompleted: Boolean(r.is_completed),
         createdAt: r.created_at,
+        repeatType: r.repeat_type,
+        repeatIntervalDays: r.repeat_interval_days ?? undefined,
+        repeatWeekdays: r.repeat_weekdays ? JSON.parse(r.repeat_weekdays) : undefined,
+        lastCompletedAt: r.last_completed_at,
     }));
 };
 
 export const insertQuestToDB = async (quest: Quest) => {
     const db = await getDB();
     await db.runAsync(
-        `INSERT INTO quests (id, title, category, type, xp_reward, is_completed, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?);`,
+        `INSERT INTO quests (
+            id, title, category, type, xp_reward, is_completed, created_at,
+            repeat_type, repeat_interval_days, repeat_weekdays, last_completed_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
         [
             quest.id,
             quest.title,
@@ -112,15 +180,29 @@ export const insertQuestToDB = async (quest: Quest) => {
             quest.xpReward,
             quest.isCompleted ? 1 : 0,
             quest.createdAt,
+            quest.repeatType || null,
+            quest.repeatIntervalDays || null,
+            quest.repeatWeekdays ? JSON.stringify(quest.repeatWeekdays) : null,
+            quest.lastCompletedAt || null,
         ]
     );
 };
 
-export const updateQuestCompletionDB = async (id: string, isCompleted: boolean) => {
+export const updateQuestCompletionDB = async (
+    id: string,
+    isCompleted: boolean,
+    lastCompletedAt?: string | null
+) => {
     const db = await getDB();
-    await db.runAsync(
-        'UPDATE quests SET is_completed = ? WHERE id = ?;',
-        [isCompleted ? 1 : 0, id]
+
+    const completedInt = isCompleted ? 1 : 0;
+    const completedDate = isCompleted ? (lastCompletedAt || new Date().toISOString()) : null;
+
+    const result = await db.runAsync(
+        `UPDATE quests 
+     SET is_completed = ?, last_completed_at = ? 
+     WHERE id = ?;`,
+        [completedInt, completedDate, id]
     );
 };
 
