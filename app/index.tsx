@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { View, FlatList, StyleSheet, StatusBar, ActivityIndicator } from 'react-native';
+import { View, FlatList, StyleSheet, StatusBar, ActivityIndicator, AppState, AppStateStatus } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Colors } from '@/constants/theme';
 import { PlayerStatusHeader } from '@/components/system/PlayerStatusHeader';
@@ -53,6 +53,18 @@ export default function HomeScreen() {
             router.replace('/register');
         }
     }, [isPlayerLoading, playerStats]);
+
+    useEffect(() => {
+        const subscription = AppState.addEventListener('change', async (nextState: AppStateStatus) => {
+            if (nextState === 'active') {
+                await initQuests();
+            }
+        });
+
+        return () => {
+            subscription.remove();
+        };
+    }, []);
 
     const handleToggleQuest = async (id: string) => {
         const updated = await toggleQuest(id);

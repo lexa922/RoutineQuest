@@ -1,10 +1,10 @@
 import { create } from 'zustand';
 import { Quest, TabType, QuestCategory } from '@/types/quest';
 import {
-    initDatabase,
     fetchQuestsFromDB,
     insertQuestToDB,
     updateQuestCompletionDB,
+    checkAndResetDailiesDB
 } from '@/db/client';
 
 interface QuestState {
@@ -30,6 +30,7 @@ export const useQuestStore = create<QuestState>((set, get) => ({
 
     initQuests: async () => {
         try {
+            await checkAndResetDailiesDB();
             const quests = await fetchQuestsFromDB();
             set({ quests, isLoading: false });
         } catch (error) {

@@ -31,7 +31,7 @@ export const initDatabase = async () => {
 
     await db.execAsync(`
         CREATE TABLE IF NOT EXISTS player_stats (
-                                                    id INTEGER PRIMARY KEY CHECK (id = 1),
+            id INTEGER PRIMARY KEY CHECK (id = 1),
             nickname TEXT DEFAULT 'Hunter',
             player_class TEXT DEFAULT 'Shadow Striker',
             level INTEGER DEFAULT 1,
@@ -41,9 +41,39 @@ export const initDatabase = async () => {
             hp_percentage INTEGER DEFAULT 100,
             streak_days INTEGER DEFAULT 0,
             has_penalty INTEGER DEFAULT 0,
-            is_registered INTEGER DEFAULT 0
+            is_registered INTEGER DEFAULT 0,
+            last_daily_reset TEXT DEFAULT ''
             );
     `);
+};
+
+export const checkAndResetDailiesDB = async (): Promise<boolean> => {
+    const db = await getDB();
+    const today = new Date().toISOString().split('T')[0]; // Рядок виду "YYYY-MM-DD"
+
+    const player = await db.getFirstAsync<{ last_daily_reset: string | null }>(
+        'SELECT last_daily_reset FROM player_stats WHERE id = 1;'
+    );
+
+    if (!player) return false;
+
+    if (player.last_daily_reset === today) {
+        return false;
+    }
+
+    await db.runAsync(`
+    UPDATE quests 
+    SET is_completed = 0 
+    WHERE type = 'daily';
+  `);
+
+    await db.runAsync(`
+    UPDATE player_stats 
+    SET last_daily_reset = ? 
+    WHERE id = 1;
+  `, [today]);
+
+    return true;
 };
 
 export const fetchQuestsFromDB = async (): Promise<Quest[]> => {
