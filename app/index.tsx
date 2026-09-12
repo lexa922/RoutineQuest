@@ -25,6 +25,7 @@ export default function HomeScreen() {
     const addQuest = useQuestStore((state) => state.addQuest);
     const toggleQuest = useQuestStore((state) => state.toggleQuest);
     const deleteQuest = useQuestStore((state) => state.deleteQuest);
+    const toggleSubQuest = useQuestStore((state) => state.toggleSubQuest);
 
     const playerStats = usePlayerStore((state) => state.playerStats);
     const isPlayerLoading = usePlayerStore((state) => state.isLoading);
@@ -70,10 +71,16 @@ export default function HomeScreen() {
     }, []);
 
     const handleToggleQuest = async (id: string) => {
-        const updated = await toggleQuest(id);
-        if (updated) {
-            const diff = updated.isCompleted ? updated.xpReward : -updated.xpReward;
-            await applyXpChange(diff);
+        const result = await toggleQuest(id);
+        if (result && result.xpDiff !== 0) {
+            await applyXpChange(result.xpDiff);
+        }
+    };
+
+    const handleToggleSubQuest = async (questId: string, subQuestId: string) => {
+        const result = await toggleSubQuest(questId, subQuestId);
+        if (result) {
+            await applyXpChange(result.xpDiff);
         }
     };
 
@@ -154,6 +161,7 @@ export default function HomeScreen() {
                         quest={item}
                         onToggle={handleToggleQuest}
                         onDelete={deleteQuest}
+                        onToggleSubQuest={handleToggleSubQuest}
                     />
                 )}
                 contentContainerStyle={styles.listContent}

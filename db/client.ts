@@ -1,5 +1,5 @@
 import * as SQLite from 'expo-sqlite';
-import { Quest, PlayerStats } from '@/types/quest';
+import {Quest, PlayerStats, SubQuest} from '@/types/quest';
 
 const DB_NAME = 'routine_quest.db';
 
@@ -34,6 +34,17 @@ export const initDatabase = async () => {
     `);
 
     await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS sub_quests (
+            id TEXT PRIMARY KEY NOT NULL,
+            quest_id TEXT NOT NULL,
+            title TEXT NOT NULL,
+            xp_reward INTEGER NOT NULL,
+            is_completed INTEGER DEFAULT 0,
+            FOREIGN KEY (quest_id) REFERENCES quests(id) ON DELETE CASCADE
+        );
+    `);
+
+    await db.execAsync(`
         CREATE TABLE IF NOT EXISTS player_stats (
             id INTEGER PRIMARY KEY CHECK (id = 1),
             nickname TEXT DEFAULT 'Hunter',
@@ -47,7 +58,7 @@ export const initDatabase = async () => {
             has_penalty INTEGER DEFAULT 0,
             is_registered INTEGER DEFAULT 0,
             last_daily_reset TEXT DEFAULT ''
-            );
+        );
     `);
 };
 
@@ -182,33 +193,35 @@ export const checkAndResetRegularQuestsDB = async () => {
 
 export const fetchQuestsFromDB = async (): Promise<Quest[]> => {
     const db = await getDB();
-    const rows = await db.getAllAsync<{
-        id: string;
-        title: string;
-        category: Quest['category'];
-        type: Quest['type'];
-        xp_reward: number;
-        is_completed: number;
-        created_at: string;
-        repeat_type: Quest['repeatType'];
-        repeat_interval_days: number | null;
-        repeat_weekdays: string | null;
-        last_completed_at: string | null;
-    }>('SELECT * FROM quests ORDER BY created_at DESC;');
+    const rows = await db.getAllAsync<any>('SELECT * FROM quests ORDER BY created_at DESC;');
+    const subRows = await db.getAllAsync<any>('SELECT * FROM sub_quests;');
 
-    return rows.map((r) => ({
-        id: r.id,
-        title: r.title,
-        category: r.category,
-        type: r.type,
-        xpReward: r.xp_reward,
-        isCompleted: Boolean(r.is_completed),
-        createdAt: r.created_at,
-        repeatType: r.repeat_type,
-        repeatIntervalDays: r.repeat_interval_days ?? undefined,
-        repeatWeekdays: r.repeat_weekdays ? JSON.parse(r.repeat_weekdays) : undefined,
-        lastCompletedAt: r.last_completed_at,
-    }));
+    return rows.map((r) => {
+        const subs: SubQuest[] = subRows
+            .filter((s) => s.quest_id === r.id)
+            .map((s) => ({
+                id: s.id,
+                questId: s.quest_id,
+                title: s.title,
+                xpReward: s.xp_reward,
+                isCompleted: Boolean(s.is_completed),
+            }));
+
+        return {
+            id: r.id,
+            title: r.title,
+            category: r.category,
+            type: r.type,
+            xpReward: r.xp_reward,
+            isCompleted: Boolean(r.is_completed),
+            createdAt: r.created_at,
+            repeatType: r.repeat_type,
+            repeatIntervalDays: r.repeat_interval_days ?? undefined,
+            repeatWeekdays: r.repeat_weekdays ? JSON.parse(r.repeat_weekdays) : undefined,
+            lastCompletedAt: r.last_completed_at,
+            subQuests: subs,
+        };
+    });
 };
 
 export const insertQuestToDB = async (quest: Quest) => {
@@ -231,6 +244,24 @@ export const insertQuestToDB = async (quest: Quest) => {
             quest.repeatWeekdays ? JSON.stringify(quest.repeatWeekdays) : null,
             quest.lastCompletedAt || null,
         ]
+    );
+
+    if (quest.subQuests && quest.subQuests.length > 0) {
+        for (const sub of quest.subQuests) {
+            await db.runAsync(
+                `INSERT INTO sub_quests (id, quest_id, title, xp_reward, is_completed)
+         VALUES (?, ?, ?, ?, ?);`,
+                [sub.id, quest.id, sub.title, sub.xpReward, sub.isCompleted ? 1 : 0]
+            );
+        }
+    }
+};
+
+export const updateSubQuestCompletionDB = async (subQuestId: string, isCompleted: boolean) => {
+    const db = await getDB();
+    await db.runAsync(
+        'UPDATE sub_quests SET is_completed = ? WHERE id = ?;',
+        [isCompleted ? 1 : 0, subQuestId]
     );
 };
 

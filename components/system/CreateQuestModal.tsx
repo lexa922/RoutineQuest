@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Colors } from '@/constants/theme';
-import { TabType, QuestCategory, RepeatType } from '@/types/quest';
+import {TabType, QuestCategory, RepeatType, SubQuest} from '@/types/quest';
 
 export interface NewQuestPayload {
     title: string;
@@ -22,6 +22,7 @@ export interface NewQuestPayload {
     repeatType?: RepeatType;
     repeatIntervalDays?: number;
     repeatWeekdays?: number[];
+    subQuests?: SubQuest[];
 }
 
 interface Props {
@@ -61,10 +62,13 @@ export const CreateQuestModal: React.FC<Props> = ({ visible, onClose, onSubmit }
     const [type, setType] = useState<TabType>('daily');
     const [xpReward, setXpReward] = useState<number>(25);
 
-    // Стан для регулярних налаштувань
     const [repeatMode, setRepeatMode] = useState<RepeatType>('weekdays');
-    const [selectedWeekdays, setSelectedWeekdays] = useState<number[]>([1, 3, 5]); // За замовчуванням Пн, Ср, Пт
+    const [selectedWeekdays, setSelectedWeekdays] = useState<number[]>([1, 3, 5]);
     const [intervalDays, setIntervalDays] = useState<number>(3);
+
+    const [subQuestsInput, setSubQuestsInput] = useState<{ title: string; xp: number }[]>([]);
+    const [tempSubTitle, setTempSubTitle] = useState('');
+    const [tempSubXp, setTempSubXp] = useState(15);
 
     const toggleWeekday = (dayId: number) => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -78,6 +82,14 @@ export const CreateQuestModal: React.FC<Props> = ({ visible, onClose, onSubmit }
 
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
+        const generatedSubQuests: SubQuest[] = subQuestsInput.map((s, index) => ({
+            id: `${Date.now()}_sub_${index}`,
+            questId: '',
+            title: s.title,
+            xpReward: s.xp,
+            isCompleted: false,
+        }));
+
         const payload: NewQuestPayload = {
             title: title.trim(),
             category,
@@ -88,11 +100,27 @@ export const CreateQuestModal: React.FC<Props> = ({ visible, onClose, onSubmit }
                 repeatIntervalDays: repeatMode === 'interval' ? intervalDays : undefined,
                 repeatWeekdays: repeatMode === 'weekdays' ? selectedWeekdays : undefined,
             }),
+            subQuests: type === 'main' && generatedSubQuests.length > 0 ? generatedSubQuests : undefined,
         };
+
 
         onSubmit(payload);
         setTitle('');
         onClose();
+    };
+
+    const handleAddSubQuest = () => {
+        if (!tempSubTitle.trim()) return;
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        setSubQuestsInput((prev) => [
+            ...prev,
+            { title: tempSubTitle.trim(), xp: tempSubXp },
+        ]);
+        setTempSubTitle('');
+    };
+
+    const handleRemoveSubQuest = (idx: number) => {
+        setSubQuestsInput((prev) => prev.filter((_, i) => i !== idx));
     };
 
     return (
@@ -102,7 +130,6 @@ export const CreateQuestModal: React.FC<Props> = ({ visible, onClose, onSubmit }
                 style={styles.backdrop}
             >
                 <View style={styles.modalBox}>
-                    {/* Системний хедер */}
                     <View style={styles.header}>
                         <View style={styles.headerTitleRow}>
                             <View style={styles.statusIndicator} />
@@ -114,7 +141,6 @@ export const CreateQuestModal: React.FC<Props> = ({ visible, onClose, onSubmit }
                     </View>
 
                     <ScrollView showsVerticalScrollIndicator={false}>
-                        {/* Назва завдання */}
                         <Text style={styles.sectionLabel}>ДИРЕКТИВА / НАЗВА</Text>
                         <TextInput
                             value={title}
@@ -124,7 +150,6 @@ export const CreateQuestModal: React.FC<Props> = ({ visible, onClose, onSubmit }
                             style={styles.input}
                         />
 
-                        {/* Атрибут */}
                         <Text style={styles.sectionLabel}>АТРИБУТ РОЗВИТКУ</Text>
                         <View style={styles.rowSelector}>
                             {CATEGORIES.map((c) => {
@@ -146,7 +171,6 @@ export const CreateQuestModal: React.FC<Props> = ({ visible, onClose, onSubmit }
                             })}
                         </View>
 
-                        {/* Тип квесту */}
                         <Text style={styles.sectionLabel}>ТИП ЗАВДАННЯ</Text>
                         <View style={styles.rowSelector}>
                             {QUEST_TYPES.map((t) => {
@@ -168,7 +192,6 @@ export const CreateQuestModal: React.FC<Props> = ({ visible, onClose, onSubmit }
                             })}
                         </View>
 
-                        {/* Динамічний блок регулярного розкладу */}
                         {type === 'regular' && (
                             <View style={styles.regularContainer}>
                                 <Text style={styles.subSectionLabel}>// РЕЖИМ ПОВТОРЕННЯ</Text>
@@ -214,7 +237,6 @@ export const CreateQuestModal: React.FC<Props> = ({ visible, onClose, onSubmit }
                                     </Pressable>
                                 </View>
 
-                                {/* Селектор днів тижня */}
                                 {repeatMode === 'weekdays' ? (
                                     <View style={styles.weekdaysRow}>
                                         {WEEKDAYS.map((w) => {
@@ -233,7 +255,6 @@ export const CreateQuestModal: React.FC<Props> = ({ visible, onClose, onSubmit }
                                         })}
                                     </View>
                                 ) : (
-                                    /* Селектор інтервалу */
                                     <View style={styles.rowSelector}>
                                         {INTERVAL_OPTIONS.map((days) => {
                                             const active = intervalDays === days;
@@ -262,7 +283,44 @@ export const CreateQuestModal: React.FC<Props> = ({ visible, onClose, onSubmit }
                             </View>
                         )}
 
-                        {/* Нагорода XP */}
+                        {type === 'main' && (
+                            <View style={styles.mainSubContainer}>
+                                <Text style={styles.subSectionLabel}>// ДИРЕКТИВИ ЕТАПІВ (ПІДКВЕСТИ)</Text>
+
+                                {subQuestsInput.map((item, idx) => (
+                                    <View key={idx} style={styles.subQuestItem}>
+                                        <Text style={styles.subQuestBullet}>▶</Text>
+                                        <Text style={styles.subQuestItemTitle} numberOfLines={1}>
+                                            {item.title}
+                                        </Text>
+                                        <Text style={styles.subQuestItemXp}>+{item.xp} XP</Text>
+                                        <Pressable onPress={() => handleRemoveSubQuest(idx)} hitSlop={6}>
+                                            <Text style={styles.subQuestDelete}>✕</Text>
+                                        </Pressable>
+                                    </View>
+                                ))}
+
+                                <View style={styles.addSubRow}>
+                                    <TextInput
+                                        value={tempSubTitle}
+                                        onChangeText={setTempSubTitle}
+                                        placeholder="Назва етапу..."
+                                        placeholderTextColor={Colors.textMuted}
+                                        style={[styles.input, { flex: 1, paddingVertical: 6 }]}
+                                    />
+                                    <Pressable
+                                        onPress={() => setTempSubXp((prev) => (prev === 15 ? 25 : prev === 25 ? 50 : 15))}
+                                        style={styles.subXpSelector}
+                                    >
+                                        <Text style={styles.subXpSelectorText}>+{tempSubXp} XP</Text>
+                                    </Pressable>
+                                    <Pressable onPress={handleAddSubQuest} style={styles.addSubBtn}>
+                                        <Text style={styles.addSubBtnText}>+ ДОДАТИ</Text>
+                                    </Pressable>
+                                </View>
+                            </View>
+                        )}
+
                         <Text style={styles.sectionLabel}>НАГОРОДА XP</Text>
                         <View style={styles.xpRow}>
                             {XP_TIERS.map((tier) => {
@@ -285,7 +343,6 @@ export const CreateQuestModal: React.FC<Props> = ({ visible, onClose, onSubmit }
                         </View>
                     </ScrollView>
 
-                    {/* Нижні дії */}
                     <View style={styles.actionsRow}>
                         <Pressable style={styles.cancelBtn} onPress={onClose}>
                             <Text style={styles.cancelText}>СКАСУВАТИ</Text>
@@ -521,5 +578,71 @@ const styles = StyleSheet.create({
         fontFamily: 'monospace',
         fontWeight: '800',
         letterSpacing: 1.2,
+    },
+    mainSubContainer: {
+        marginTop: 10,
+        padding: 10,
+        backgroundColor: 'rgba(18, 22, 34, 0.5)',
+        borderWidth: 1,
+        borderColor: 'rgba(0, 240, 255, 0.2)',
+        gap: 8,
+    },
+    subQuestItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 4,
+        gap: 8,
+    },
+    subQuestBullet: {
+        color: Colors.neonBlue,
+        fontSize: 10,
+    },
+    subQuestItemTitle: {
+        flex: 1,
+        color: Colors.textWhite,
+        fontSize: 12,
+        fontFamily: 'monospace',
+    },
+    subQuestItemXp: {
+        color: Colors.amberWarning,
+        fontSize: 10,
+        fontFamily: 'monospace',
+    },
+    subQuestDelete: {
+        color: Colors.crimsonRed,
+        fontSize: 12,
+        paddingHorizontal: 4,
+    },
+    addSubRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginTop: 4,
+    },
+    subXpSelector: {
+        paddingHorizontal: 8,
+        paddingVertical: 7,
+        borderWidth: 1,
+        borderColor: Colors.borderCard,
+        backgroundColor: '#121622',
+    },
+    subXpSelectorText: {
+        color: Colors.amberWarning,
+        fontSize: 10,
+        fontFamily: 'monospace',
+        fontWeight: '700',
+    },
+    addSubBtn: {
+        backgroundColor: Colors.neonBlueDim,
+        borderWidth: 1,
+        borderColor: Colors.neonBlue,
+        paddingVertical: 7,
+        paddingHorizontal: 10,
+    },
+    addSubBtnText: {
+        color: Colors.neonBlue,
+        fontSize: 10,
+        fontFamily: 'monospace',
+        fontWeight: '800',
     },
 });

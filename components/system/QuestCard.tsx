@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useEffect} from 'react';
 import { View, Text, StyleSheet, Pressable, Alert } from 'react-native';
 import Animated, {
     useAnimatedStyle,
@@ -14,6 +14,7 @@ interface QuestProps {
     quest: Quest;
     onToggle: (id: string) => void;
     onDelete: (id: string) => void;
+    onToggleSubQuest?: (questId: string, subQuestId: string) => void;
 }
 
 const getScheduleLabel = (quest: Quest): string | null => {
@@ -29,15 +30,17 @@ const getScheduleLabel = (quest: Quest): string | null => {
     return null;
 };
 
-export const QuestCard: React.FC<QuestProps> = ({ quest, onToggle, onDelete }) => {
+export const QuestCard: React.FC<QuestProps> = ({ quest, onToggle, onDelete, onToggleSubQuest }) => {
     const checkScale = useSharedValue(quest.isCompleted ? 1 : 0);
     const cardOpacity = useSharedValue(quest.isCompleted ? 0.45 : 1);
 
+    useEffect(() => {
+        checkScale.value = withSpring(quest.isCompleted ? 1 : 0);
+        cardOpacity.value = withTiming(quest.isCompleted ? 0.45 : 1, { duration: 200 });
+    }, [quest.isCompleted]);
+
     const handlePress = () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        const nextState = !quest.isCompleted;
-        checkScale.value = withSpring(nextState ? 1 : 0);
-        cardOpacity.value = withTiming(nextState ? 0.45 : 1, { duration: 200 });
         onToggle(quest.id);
     };
 
@@ -73,33 +76,67 @@ export const QuestCard: React.FC<QuestProps> = ({ quest, onToggle, onDelete }) =
 
     return (
         <Animated.View style={[styles.cardContainer, animatedCardStyle]}>
-            <Pressable onPress={handlePress} style={styles.cardContent}>
-                <View style={styles.rhombusOutline}>
-                    <Animated.View style={[styles.rhombusFill, animatedCheckStyle]} />
-                </View>
-
-                <View style={styles.centerBlock}>
-                    <View style={styles.tagRow}>
-                        <Text style={[styles.categoryTag, styles[`tag_${quest.category}`]]}>
-                            [{quest.category}]
-                        </Text>
-                        {scheduleLabel && (
-                            <Text style={styles.cooldownText}>RESET: {scheduleLabel}</Text>
-                        )}
+            <View style={styles.cardContent}>
+                {/* Головний чекбокс */}
+                <Pressable onPress={handlePress} style={styles.rhombusHitArea} hitSlop={6}>
+                    <View style={styles.rhombusOutline}>
+                        <Animated.View style={[styles.rhombusFill, animatedCheckStyle]} />
                     </View>
-                    <Text
-                        style={[styles.questTitle, quest.isCompleted && styles.completedTitle]}
-                        numberOfLines={1}
-                    >
-                        {quest.title}
-                    </Text>
+                </Pressable>
+
+                {/* Центральна колонка */}
+                <View style={styles.centerBlock}>
+                    <Pressable onPress={handlePress}>
+                        <View style={styles.tagRow}>
+                            <Text style={[styles.categoryTag, styles[`tag_${quest.category}`]]}>
+                                [{quest.category}]
+                            </Text>
+                            {scheduleLabel && (
+                                <Text style={styles.cooldownText}>RESET: {scheduleLabel}</Text>
+                            )}
+                        </View>
+                        <Text
+                            style={[styles.questTitle, quest.isCompleted && styles.completedTitle]}
+                            numberOfLines={2}
+                        >
+                            {quest.title}
+                        </Text>
+                    </Pressable>
+
+                    {/* Підквести тепер знаходяться всередині вертикального потоку */}
+                    {quest.subQuests && quest.subQuests.length > 0 && (
+                        <View style={styles.subListContainer}>
+                            {quest.subQuests.map((sub) => (
+                                <Pressable
+                                    key={sub.id}
+                                    onPress={() => {
+                                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                        onToggleSubQuest?.(quest.id, sub.id);
+                                    }}
+                                    style={styles.subItemRow}
+                                    hitSlop={4}
+                                >
+                                    <View style={[styles.subMiniBox, sub.isCompleted && styles.subMiniBoxDone]} />
+                                    <Text
+                                        style={[styles.subItemText, sub.isCompleted && styles.completedTitle]}
+                                        numberOfLines={1}
+                                    >
+                                        {sub.title}
+                                    </Text>
+                                    <Text style={styles.subItemXp}>+{sub.xpReward} XP</Text>
+                                </Pressable>
+                            ))}
+                        </View>
+                    )}
                 </View>
 
+                {/* Блок XP */}
                 <View style={styles.rewardBlock}>
                     <Text style={styles.rewardXp}>+{quest.xpReward}</Text>
                     <Text style={styles.rewardLabel}>XP</Text>
                 </View>
 
+                {/* Кнопка видалення */}
                 <Pressable
                     onPress={handleDelete}
                     hitSlop={8}
@@ -107,7 +144,7 @@ export const QuestCard: React.FC<QuestProps> = ({ quest, onToggle, onDelete }) =
                 >
                     <Text style={styles.deleteText}>✕</Text>
                 </Pressable>
-            </Pressable>
+            </View>
         </Animated.View>
     );
 };
@@ -123,23 +160,26 @@ const styles = StyleSheet.create({
     },
     cardContent: {
         flexDirection: 'row',
-        alignItems: 'center',
+        alignItems: 'flex-start',
         paddingVertical: 14,
         paddingHorizontal: 14,
     },
+    rhombusHitArea: {
+        marginRight: 14,
+        paddingTop: 2,
+    },
     rhombusOutline: {
-        width: 22,
-        height: 22,
+        width: 20,
+        height: 20,
         borderWidth: 1.5,
         borderColor: Colors.neonBlue,
         transform: [{ rotate: '45deg' }],
         alignItems: 'center',
         justifyContent: 'center',
-        marginRight: 16,
     },
     rhombusFill: {
-        width: 14,
-        height: 14,
+        width: 12,
+        height: 12,
         backgroundColor: Colors.neonBlue,
     },
     centerBlock: {
@@ -176,10 +216,45 @@ const styles = StyleSheet.create({
         textDecorationLine: 'line-through',
         color: Colors.textMuted,
     },
+    subListContainer: {
+        marginTop: 10,
+        paddingTop: 8,
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(30, 38, 56, 0.6)',
+        gap: 6,
+    },
+    subItemRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        paddingVertical: 2,
+    },
+    subMiniBox: {
+        width: 10,
+        height: 10,
+        borderWidth: 1,
+        borderColor: Colors.neonBlue,
+    },
+    subMiniBoxDone: {
+        backgroundColor: Colors.neonBlue,
+    },
+    subItemText: {
+        flex: 1,
+        color: Colors.textMuted,
+        fontSize: 11,
+        fontFamily: 'monospace',
+    },
+    subItemXp: {
+        color: Colors.amberWarning,
+        fontSize: 9,
+        fontFamily: 'monospace',
+    },
     rewardBlock: {
         alignItems: 'flex-end',
         minWidth: 44,
-        marginRight: 12,
+        marginLeft: 8,
+        marginRight: 10,
+        paddingTop: 2,
     },
     rewardXp: {
         color: Colors.neonBlue,
@@ -198,6 +273,7 @@ const styles = StyleSheet.create({
         borderLeftColor: 'rgba(30, 38, 56, 0.6)',
         alignItems: 'center',
         justifyContent: 'center',
+        paddingTop: 2,
     },
     deleteText: {
         color: Colors.textMuted,
