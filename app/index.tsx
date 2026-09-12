@@ -28,6 +28,7 @@ export default function HomeScreen() {
     const isPlayerLoading = usePlayerStore((state) => state.isLoading);
     const initPlayer = usePlayerStore((state) => state.initPlayer);
     const applyXpChange = usePlayerStore((state) => state.applyXpChange);
+    const deleteQuest = useQuestStore((state) => state.deleteQuest);
 
     const [isModalVisible, setIsModalVisible] = useState(false);
 
@@ -127,7 +128,11 @@ export default function HomeScreen() {
                 data={filteredQuests}
                 keyExtractor={(item) => item.id}
                 renderItem={({ item }) => (
-                    <QuestCard quest={item} onToggle={handleToggleQuest} />
+                    <QuestCard
+                        quest={item}
+                        onToggle={handleToggleQuest}
+                        onDelete={deleteQuest}
+                    />
                 )}
                 contentContainerStyle={styles.listContent}
                 showsVerticalScrollIndicator={false}

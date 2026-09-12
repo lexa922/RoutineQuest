@@ -4,7 +4,8 @@ import {
     fetchQuestsFromDB,
     insertQuestToDB,
     updateQuestCompletionDB,
-    checkAndResetDailiesDB
+    checkAndResetDailiesDB,
+    deleteQuestFromDB
 } from '@/db/client';
 
 interface QuestState {
@@ -21,6 +22,7 @@ interface QuestState {
         xpReward: number;
     }) => Promise<void>;
     toggleQuest: (id: string) => Promise<Quest | null>;
+    deleteQuest: (id: string) => Promise<void>;
 }
 
 export const useQuestStore = create<QuestState>((set, get) => ({
@@ -86,5 +88,12 @@ export const useQuestStore = create<QuestState>((set, get) => ({
 
         await updateQuestCompletionDB(id, nextCompleted, updatedQuest.lastCompletedAt);
         return updatedQuest;
+    },
+    deleteQuest: async (id: string) => {
+        set((state) => ({
+            quests: state.quests.filter((q) => q.id !== id),
+        }));
+
+        await deleteQuestFromDB(id);
     },
 }));

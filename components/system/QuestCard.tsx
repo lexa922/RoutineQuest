@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Alert } from 'react-native';
 import Animated, {
     useAnimatedStyle,
     withSpring,
@@ -13,6 +13,7 @@ import { Quest } from '@/types/quest';
 interface QuestProps {
     quest: Quest;
     onToggle: (id: string) => void;
+    onDelete: (id: string) => void;
 }
 
 const getScheduleLabel = (quest: Quest): string | null => {
@@ -28,7 +29,7 @@ const getScheduleLabel = (quest: Quest): string | null => {
     return null;
 };
 
-export const QuestCard: React.FC<QuestProps> = ({ quest, onToggle }) => {
+export const QuestCard: React.FC<QuestProps> = ({ quest, onToggle, onDelete }) => {
     const checkScale = useSharedValue(quest.isCompleted ? 1 : 0);
     const cardOpacity = useSharedValue(quest.isCompleted ? 0.45 : 1);
 
@@ -38,6 +39,25 @@ export const QuestCard: React.FC<QuestProps> = ({ quest, onToggle }) => {
         checkScale.value = withSpring(nextState ? 1 : 0);
         cardOpacity.value = withTiming(nextState ? 0.45 : 1, { duration: 200 });
         onToggle(quest.id);
+    };
+
+    const handleDelete = () => {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        Alert.alert(
+            '[ ДИРЕКТИВА: ВИДАЛЕННЯ ]',
+            `Ви впевнені, що хочете остаточно ліквідувати квест "${quest.title}"?`,
+            [
+                { text: 'ВІДМІНА', style: 'cancel' },
+                {
+                    text: 'ЛІКВІДУВАТИ',
+                    style: 'destructive',
+                    onPress: () => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+                        onDelete(quest.id);
+                    },
+                },
+            ]
+        );
     };
 
     const animatedCheckStyle = useAnimatedStyle(() => ({
@@ -67,7 +87,6 @@ export const QuestCard: React.FC<QuestProps> = ({ quest, onToggle }) => {
                             <Text style={styles.cooldownText}>RESET: {scheduleLabel}</Text>
                         )}
                     </View>
-
                     <Text
                         style={[styles.questTitle, quest.isCompleted && styles.completedTitle]}
                         numberOfLines={1}
@@ -80,6 +99,14 @@ export const QuestCard: React.FC<QuestProps> = ({ quest, onToggle }) => {
                     <Text style={styles.rewardXp}>+{quest.xpReward}</Text>
                     <Text style={styles.rewardLabel}>XP</Text>
                 </View>
+
+                <Pressable
+                    onPress={handleDelete}
+                    hitSlop={8}
+                    style={styles.deleteButton}
+                >
+                    <Text style={styles.deleteText}>✕</Text>
+                </Pressable>
             </Pressable>
         </Animated.View>
     );
@@ -152,6 +179,7 @@ const styles = StyleSheet.create({
     rewardBlock: {
         alignItems: 'flex-end',
         minWidth: 44,
+        marginRight: 12,
     },
     rewardXp: {
         color: Colors.neonBlue,
@@ -163,5 +191,17 @@ const styles = StyleSheet.create({
         color: Colors.textMuted,
         fontSize: 9,
         fontFamily: 'monospace',
+    },
+    deleteButton: {
+        padding: 6,
+        borderLeftWidth: 1,
+        borderLeftColor: 'rgba(30, 38, 56, 0.6)',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    deleteText: {
+        color: Colors.textMuted,
+        fontSize: 13,
+        fontWeight: 'bold',
     },
 });

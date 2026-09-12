@@ -269,3 +269,8 @@ export const registerPlayerDB = async (nickname: string, playerClass: string) =>
         [nickname, playerClass]
     );
 };
+
+export const deleteQuestFromDB = async (id: string) => {
+    const db = await getDB();
+    await db.runAsync('DELETE FROM quests WHERE id = ?;', [id]);
+};
