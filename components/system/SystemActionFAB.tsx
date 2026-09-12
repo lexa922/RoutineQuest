@@ -36,7 +36,6 @@ const styles = StyleSheet.create({
         paddingVertical: 12,
         paddingHorizontal: 22,
         gap: 6,
-        // Світловий неоновий ефект
         elevation: 8,
     },
     fabIcon: {

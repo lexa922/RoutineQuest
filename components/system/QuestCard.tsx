@@ -77,14 +77,12 @@ export const QuestCard: React.FC<QuestProps> = ({ quest, onToggle, onDelete, onT
     return (
         <Animated.View style={[styles.cardContainer, animatedCardStyle]}>
             <View style={styles.cardContent}>
-                {/* Головний чекбокс */}
                 <Pressable onPress={handlePress} style={styles.rhombusHitArea} hitSlop={6}>
                     <View style={styles.rhombusOutline}>
                         <Animated.View style={[styles.rhombusFill, animatedCheckStyle]} />
                     </View>
                 </Pressable>
 
-                {/* Центральна колонка */}
                 <View style={styles.centerBlock}>
                     <Pressable onPress={handlePress}>
                         <View style={styles.tagRow}>
@@ -103,7 +101,6 @@ export const QuestCard: React.FC<QuestProps> = ({ quest, onToggle, onDelete, onT
                         </Text>
                     </Pressable>
 
-                    {/* Підквести тепер знаходяться всередині вертикального потоку */}
                     {quest.subQuests && quest.subQuests.length > 0 && (
                         <View style={styles.subListContainer}>
                             {quest.subQuests.map((sub) => (
@@ -130,13 +127,11 @@ export const QuestCard: React.FC<QuestProps> = ({ quest, onToggle, onDelete, onT
                     )}
                 </View>
 
-                {/* Блок XP */}
                 <View style={styles.rewardBlock}>
                     <Text style={styles.rewardXp}>+{quest.xpReward}</Text>
                     <Text style={styles.rewardLabel}>XP</Text>
                 </View>
 
-                {/* Кнопка видалення */}
                 <Pressable
                     onPress={handleDelete}
                     hitSlop={8}

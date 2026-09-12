@@ -9,7 +9,6 @@ import Animated, {
     Easing
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
-import * as Haptics from 'expo-haptics';
 import { Colors } from '@/constants/theme';
 
 interface PlayerStatusProps {
@@ -39,9 +38,7 @@ export const PlayerStatusHeader: React.FC<PlayerStatusProps> = ({
     }) => {
     const xpWidth = useSharedValue(0);
 
-    const prevStreak = React.useRef<number | null>(null);
     const flashAnim = useSharedValue(0);
-    const streakGlow = useSharedValue(0);
 
     useEffect(() => {
         const targetWidth = Math.min((currentXp / maxXp) * 100, 100);
@@ -82,10 +79,6 @@ export const PlayerStatusHeader: React.FC<PlayerStatusProps> = ({
             );
         }
     }, [streakDays]);
-
-    const animatedGlowTextStyle = useAnimatedStyle(() => ({
-        color: streakGlow.value > 0.5 ? '#00FFFF' : Colors.amberWarning,
-    }));
 
     return (
         <View style={styles.headerWrapper}>
