@@ -55,15 +55,16 @@ export const checkAndResetDailiesDB = async (): Promise<boolean> => {
     const db = await getDB();
     const today = new Date().toISOString().split('T')[0];
 
-    const player = await db.getFirstAsync<{ last_daily_reset: string | null }>(
-        'SELECT last_daily_reset FROM player_stats WHERE id = 1;'
-    );
+    const player = await db.getFirstAsync<{
+        last_daily_reset: string | null;
+        hp_percentage: number;
+        streak_days: number;
+        has_penalty: number;
+    }>('SELECT last_daily_reset, hp_percentage, streak_days, has_penalty FROM player_stats WHERE id = 1;');
 
-    if (!player) {
-        await db.runAsync(`
-      INSERT OR IGNORE INTO player_stats (id, last_daily_reset)
-      VALUES (1, ?);
-    `, [today]);
+    if (!player) return false;
+
+    if (player.last_daily_reset === today) {
         return false;
     }
 
@@ -75,24 +76,69 @@ export const checkAndResetDailiesDB = async (): Promise<boolean> => {
         return false;
     }
 
-    if (player.last_daily_reset === today) {
-        return false;
-    }
-
-    await db.runAsync(`
-    UPDATE quests 
-    SET is_completed = 0 
-    WHERE type = 'daily';
-  `);
-
-    await checkAndResetRegularQuestsDB();
-
-    await db.runAsync(
-        'UPDATE player_stats SET last_daily_reset = ? WHERE id = 1;',
-        [today]
+    const uncompletedDailies = await db.getAllAsync<{ id: string }>(
+        "SELECT id FROM quests WHERE type = 'daily' AND is_completed = 0;"
     );
 
+    const completedDailies = await db.getAllAsync<{ id: string }>(
+        "SELECT id FROM quests WHERE type = 'daily' AND is_completed = 1;"
+    );
+
+    let hpDamage = 0;
+    let newStreak = player.streak_days;
+    let penaltyActivated = player.has_penalty;
+
+    if (uncompletedDailies.length > 0) {
+        hpDamage += uncompletedDailies.length * 15;
+        newStreak = 0;
+        penaltyActivated = 1;
+    } else if (completedDailies.length > 0) {
+        newStreak += 1;
+    }
+
+
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayDayOfWeek = yesterday.getDay() === 0 ? 7 : yesterday.getDay();
+
+    const regularDamage = await checkYesterdayRegularPenalties(db, yesterdayDayOfWeek);
+    hpDamage += regularDamage;
+    if (regularDamage > 0) {
+        penaltyActivated = 1;
+    }
+
+    const finalHp = Math.max(0, player.hp_percentage - hpDamage);
+
+    await db.runAsync(`
+    UPDATE player_stats 
+    SET hp_percentage = ?, streak_days = ?, has_penalty = ?, last_daily_reset = ? 
+    WHERE id = 1;
+  `, [finalHp, newStreak, penaltyActivated, today]);
+
+    await db.runAsync("UPDATE quests SET is_completed = 0 WHERE type = 'daily';");
+    await checkAndResetRegularQuestsDB();
+
     return true;
+};
+
+const checkYesterdayRegularPenalties = async (
+    db: any,
+    yesterdayDayOfWeek: number
+): Promise<number> => {
+    const quests = await fetchQuestsFromDB();
+    let damage = 0;
+
+    for (const q of quests) {
+        if (q.type !== 'regular') continue;
+
+        if (q.repeatType === 'weekdays' && q.repeatWeekdays?.includes(yesterdayDayOfWeek)) {
+            if (!q.isCompleted) {
+                damage += 10;
+            }
+        }
+    }
+
+    return damage;
 };
 
 export const checkAndResetRegularQuestsDB = async () => {
@@ -273,4 +319,13 @@ export const registerPlayerDB = async (nickname: string, playerClass: string) =>
 export const deleteQuestFromDB = async (id: string) => {
     const db = await getDB();
     await db.runAsync('DELETE FROM quests WHERE id = ?;', [id]);
+};
+
+export const clearPenaltyDB = async () => {
+    const db = await getDB();
+    await db.runAsync(`
+    UPDATE player_stats 
+    SET has_penalty = 0, hp_percentage = 100 
+    WHERE id = 1;
+  `);
 };

@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import {View, Text, StyleSheet, Pressable} from 'react-native';
 import Animated, {
     useSharedValue,
     useAnimatedStyle,
@@ -19,6 +19,7 @@ interface PlayerStatusProps {
     hpPercentage: number;
     streakDays: number;
     hasPenalty: boolean;
+    onResolvePenalty?: () => void;
 }
 
 export const PlayerStatusHeader: React.FC<PlayerStatusProps> = ({
@@ -31,6 +32,7 @@ export const PlayerStatusHeader: React.FC<PlayerStatusProps> = ({
     hpPercentage,
     streakDays,
     hasPenalty,
+    onResolvePenalty,
     }) => {
     const xpWidth = useSharedValue(0);
 
@@ -48,7 +50,6 @@ export const PlayerStatusHeader: React.FC<PlayerStatusProps> = ({
 
     return (
         <View style={styles.headerWrapper}>
-            {/* Верхній рядок: Позивний гравця та клас */}
             <View style={styles.identityRow}>
                 <View style={styles.callsignBlock}>
                     <Text style={styles.callsignPrefix}>OPERATOR // </Text>
@@ -58,15 +59,12 @@ export const PlayerStatusHeader: React.FC<PlayerStatusProps> = ({
             </View>
 
             <View style={styles.topRow}>
-                {/* Аватар / Ранг */}
                 <View style={styles.rankBadge}>
                     <Text style={styles.rankText}>[{rank}]</Text>
                     <Text style={styles.levelText}>LVL {level}</Text>
                 </View>
 
-                {/* Метрики стану */}
                 <View style={styles.barsContainer}>
-                    {/* HP Bar */}
                     <View style={styles.barBlock}>
                         <View style={styles.barLabelRow}>
                             <Text style={styles.barLabel}>DISCIPLINE (HP)</Text>
@@ -82,7 +80,6 @@ export const PlayerStatusHeader: React.FC<PlayerStatusProps> = ({
                         </View>
                     </View>
 
-                    {/* XP Bar */}
                     <View style={styles.barBlock}>
                         <View style={styles.barLabelRow}>
                             <Text style={[styles.barLabel, { color: Colors.neonBlue }]}>
@@ -98,26 +95,32 @@ export const PlayerStatusHeader: React.FC<PlayerStatusProps> = ({
                     </View>
                 </View>
 
-                {/* Streak Counter */}
                 <View style={styles.streakBadge}>
                     <Text style={styles.flameIcon}>▲</Text>
                     <Text style={styles.streakCount}>{streakDays}D</Text>
                 </View>
             </View>
 
-            {/* Зона тривоги / Бафів */}
             {hasPenalty && (
-                <View style={styles.penaltyAlert}>
+                <Pressable
+                    style={styles.penaltyAlert}
+                    onPress={onResolvePenalty}
+                >
                     <LinearGradient
                         colors={[Colors.crimsonGlow, 'transparent']}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 0 }}
                         style={StyleSheet.absoluteFill}
                     />
-                    <Text style={styles.penaltyText}>
-                        [УВАГА: АКТИВОВАНО ШТРАФНИЙ КВЕСТ]
-                    </Text>
-                </View>
+                    <View style={styles.penaltyContent}>
+                        <Text style={styles.penaltyText}>
+                            [УВАГА: АКТИВОВАНО ШТРАФНИЙ КВЕСТ]
+                        </Text>
+                        <Text style={styles.penaltyAction}>
+                            ВИКОНАТИ СПОКУТУ ▶
+                        </Text>
+                    </View>
+                </Pressable>
             )}
         </View>
     );
@@ -258,5 +261,16 @@ const styles = StyleSheet.create({
         fontFamily: 'monospace',
         fontWeight: '700',
         letterSpacing: 1.1,
+    },
+    penaltyContent: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    penaltyAction: {
+        color: Colors.crimsonRed,
+        fontSize: 9,
+        fontFamily: 'monospace',
+        fontWeight: '800',
     },
 });

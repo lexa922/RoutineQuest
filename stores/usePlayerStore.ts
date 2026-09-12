@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { PlayerStats } from '@/types/quest';
 import {
+    clearPenaltyDB,
     fetchPlayerStatsFromDB,
     registerPlayerDB,
     updatePlayerXpDB,
@@ -13,6 +14,7 @@ interface PlayerState {
     initPlayer: () => Promise<void>;
     registerPlayer: (nickname: string, playerClass: string) => Promise<void>;
     applyXpChange: (xpDiff: number) => Promise<void>;
+    clearPenalty: () => Promise<void>;
 }
 
 export const usePlayerStore = create<PlayerState>((set, get) => ({
@@ -66,5 +68,13 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
 
         set({ playerStats: updated });
         await updatePlayerXpDB(updated.currentXp, updated.level, updated.maxXp);
+    },
+    clearPenalty: async () => {
+        await clearPenaltyDB();
+        set((state) => ({
+            playerStats: state.playerStats
+                ? { ...state.playerStats, hasPenalty: false, hpPercentage: 100 }
+                : null,
+        }));
     },
 }));

@@ -1,5 +1,5 @@
-import React, {useEffect, useState, useMemo, useRef} from 'react';
-import { View, FlatList, StyleSheet, StatusBar, ActivityIndicator, AppState, AppStateStatus } from 'react-native';
+import React, {useEffect, useState, useMemo} from 'react';
+import { View, FlatList, StyleSheet, StatusBar, ActivityIndicator, AppState, AppStateStatus, Alert} from 'react-native';
 import { useRouter } from 'expo-router';
 import { Colors } from '@/constants/theme';
 import { PlayerStatusHeader } from '@/components/system/PlayerStatusHeader';
@@ -7,6 +7,7 @@ import { QuestCard } from '@/components/system/QuestCard';
 import { QuestFilterTabs } from '@/components/system/QuestFilterTabs';
 import { SystemActionFAB } from '@/components/system/SystemActionFAB';
 import { CreateQuestModal} from '@/components/system/CreateQuestModal';
+import * as Haptics from 'expo-haptics';
 
 import { useQuestStore } from '@/stores/useQuestStore';
 import { usePlayerStore } from '@/stores/usePlayerStore';
@@ -23,12 +24,13 @@ export default function HomeScreen() {
     const setActiveTab = useQuestStore((state) => state.setActiveTab);
     const addQuest = useQuestStore((state) => state.addQuest);
     const toggleQuest = useQuestStore((state) => state.toggleQuest);
+    const deleteQuest = useQuestStore((state) => state.deleteQuest);
 
     const playerStats = usePlayerStore((state) => state.playerStats);
     const isPlayerLoading = usePlayerStore((state) => state.isLoading);
     const initPlayer = usePlayerStore((state) => state.initPlayer);
     const applyXpChange = usePlayerStore((state) => state.applyXpChange);
-    const deleteQuest = useQuestStore((state) => state.deleteQuest);
+    const clearPenalty = usePlayerStore((state) => state.clearPenalty);
 
     const [isModalVisible, setIsModalVisible] = useState(false);
 
@@ -102,6 +104,25 @@ export default function HomeScreen() {
         );
     }
 
+    const handleResolvePenalty = () => {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        Alert.alert(
+            '[ СИСТЕМНЕ ПОКАРАННЯ ]',
+            'Пропущено щоденні обов\'язки. Для зняття штрафу та відновлення HP виконайте:\n\n• 50 відтискань або 30 хв глибокої концентрації без телефона.',
+            [
+                { text: 'ВІДКЛАСТИ', style: 'cancel' },
+                {
+                    text: 'ШТРАФ ВИКОНАНО',
+                    style: 'default',
+                    onPress: async () => {
+                        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                        await clearPenalty();
+                    },
+                },
+            ]
+        );
+    };
+
     return (
         <View style={styles.container}>
             <StatusBar barStyle="light-content" backgroundColor={Colors.bgPrimary} />
@@ -116,6 +137,7 @@ export default function HomeScreen() {
                 hpPercentage={playerStats.hpPercentage}
                 streakDays={playerStats.streakDays}
                 hasPenalty={playerStats.hasPenalty}
+                onResolvePenalty={handleResolvePenalty}
             />
 
             <QuestFilterTabs
