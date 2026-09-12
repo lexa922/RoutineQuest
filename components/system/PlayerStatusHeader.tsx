@@ -3,10 +3,13 @@ import {View, Text, StyleSheet, Pressable} from 'react-native';
 import Animated, {
     useSharedValue,
     useAnimatedStyle,
+    withSequence,
     withTiming,
+    interpolateColor,
     Easing
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
 import { Colors } from '@/constants/theme';
 
 interface PlayerStatusProps {
@@ -36,6 +39,10 @@ export const PlayerStatusHeader: React.FC<PlayerStatusProps> = ({
     }) => {
     const xpWidth = useSharedValue(0);
 
+    const prevStreak = React.useRef<number | null>(null);
+    const flashAnim = useSharedValue(0);
+    const streakGlow = useSharedValue(0);
+
     useEffect(() => {
         const targetWidth = Math.min((currentXp / maxXp) * 100, 100);
         xpWidth.value = withTiming(targetWidth, {
@@ -46,6 +53,38 @@ export const PlayerStatusHeader: React.FC<PlayerStatusProps> = ({
 
     const animatedXpStyle = useAnimatedStyle(() => ({
         width: `${xpWidth.value}%`,
+    }));
+
+    const animatedStreakBackground = useAnimatedStyle(() => {
+        const backgroundColor = interpolateColor(
+            flashAnim.value,
+            [0, 1],
+            ['rgba(18, 22, 34, 0.8)', 'rgba(255, 170, 0, 0.28)']
+        );
+
+        const borderColor = interpolateColor(
+            flashAnim.value,
+            [0, 1],
+            [Colors.borderCard, Colors.amberWarning]
+        );
+
+        return {
+            backgroundColor,
+            borderColor,
+        };
+    });
+
+    useEffect(() => {
+        if (streakDays > 0) {
+            flashAnim.value = withSequence(
+                withTiming(1, { duration: 150 }),
+                withTiming(0, { duration: 350 })
+            );
+        }
+    }, [streakDays]);
+
+    const animatedGlowTextStyle = useAnimatedStyle(() => ({
+        color: streakGlow.value > 0.5 ? '#00FFFF' : Colors.amberWarning,
     }));
 
     return (
@@ -95,9 +134,12 @@ export const PlayerStatusHeader: React.FC<PlayerStatusProps> = ({
                     </View>
                 </View>
 
-                <View style={styles.streakBadge}>
-                    <Text style={styles.flameIcon}>▲</Text>
-                    <Text style={styles.streakCount}>{streakDays}D</Text>
+                <View style={styles.streakContainer}>
+                    <Text style={styles.streakLabel}>STREAK:</Text>
+                    <Animated.View style={[styles.streakBadge, animatedStreakBackground]}>
+                        <Text style={styles.streakIcon}>🔥</Text>
+                        <Text style={styles.streakValue}>{streakDays} D</Text>
+                    </Animated.View>
                 </View>
             </View>
 
@@ -230,11 +272,6 @@ const styles = StyleSheet.create({
         height: '100%',
         backgroundColor: Colors.neonBlue,
     },
-    streakBadge: {
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingHorizontal: 6,
-    },
     flameIcon: {
         color: Colors.amberWarning,
         fontSize: 14,
@@ -272,5 +309,43 @@ const styles = StyleSheet.create({
         fontSize: 9,
         fontFamily: 'monospace',
         fontWeight: '800',
+    },
+    streakContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    streakLabel: {
+        color: Colors.textMuted,
+        fontSize: 10,
+        fontFamily: 'monospace',
+        fontWeight: '700',
+        letterSpacing: 1,
+    },
+    streakBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderWidth: 1,
+        borderRadius: 2,
+        minWidth: 54,
+        justifyContent: 'center',
+    },
+    streakIcon: {
+        fontSize: 12,
+    },
+    streakValue: {
+        color: Colors.amberWarning,
+        fontSize: 11,
+        fontFamily: 'monospace',
+        fontWeight: '700',
+    },
+    streakUnit: {
+        color: Colors.amberWarning,
+        fontSize: 9,
+        fontFamily: 'monospace',
+        fontWeight: '700',
     },
 });

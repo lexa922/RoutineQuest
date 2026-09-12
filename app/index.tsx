@@ -1,5 +1,5 @@
-import React, {useEffect, useState, useMemo} from 'react';
-import { View, FlatList, StyleSheet, StatusBar, ActivityIndicator, AppState, AppStateStatus, Alert} from 'react-native';
+import React, {useEffect, useState, useMemo, useRef} from 'react';
+import { View, FlatList, StyleSheet, StatusBar, ActivityIndicator, AppState, AppStateStatus, Alert, Text} from 'react-native';
 import { useRouter } from 'expo-router';
 import { Colors } from '@/constants/theme';
 import { PlayerStatusHeader } from '@/components/system/PlayerStatusHeader';
@@ -12,10 +12,12 @@ import * as Haptics from 'expo-haptics';
 import { useQuestStore } from '@/stores/useQuestStore';
 import { usePlayerStore } from '@/stores/usePlayerStore';
 
-import { initDatabase } from '@/db/client';
+import {checkAndResetDailiesDB, initDatabase} from '@/db/client';
 
 export default function HomeScreen() {
     const router = useRouter();
+    const [isAppReady, setIsAppReady] = useState(false);
+    const appState = useRef(AppState.currentState);
 
     const quests = useQuestStore((state) => state.quests);
     const activeTab = useQuestStore((state) => state.activeTab);
@@ -36,36 +38,53 @@ export default function HomeScreen() {
     const [isModalVisible, setIsModalVisible] = useState(false);
 
     useEffect(() => {
-        const bootstrap = async () => {
+        if (!isPlayerLoading && isAppReady) {
+            if (!playerStats || !playerStats.isRegistered) {
+                router.replace('/register');
+            }
+        }
+    }, [isPlayerLoading, isAppReady, playerStats]);
+
+    const syncSystemData = async () => {
+        try {
+            await checkAndResetDailiesDB();
+            await initPlayer();
+            await initQuests();
+        } catch (error) {
+            console.error('[SYSTEM SYNC ERROR]:', error);
+        }
+    };
+
+    useEffect(() => {
+        let isMounted = true;
+
+        const bootstrapApp = async () => {
             try {
                 await initDatabase();
-
-                await Promise.all([
-                    initQuests(),
-                    initPlayer(),
-                ]);
+                await syncSystemData();
             } catch (e) {
-                console.error('Bootstrap error:', e);
+                console.error('[BOOTSTRAP ERROR]:', e);
+            } finally {
+                if (isMounted) {
+                    setIsAppReady(true);
+                }
             }
         };
 
-        bootstrap();
-    }, []);
+        bootstrapApp();
 
-    useEffect(() => {
-        if (!isPlayerLoading && playerStats && !playerStats.isRegistered) {
-            router.replace('/register');
-        }
-    }, [isPlayerLoading, playerStats]);
-
-    useEffect(() => {
-        const subscription = AppState.addEventListener('change', async (nextState: AppStateStatus) => {
-            if (nextState === 'active') {
-                await initQuests();
+        const subscription = AppState.addEventListener('change', async (nextAppState: AppStateStatus) => {
+            if (
+                appState.current.match(/inactive|background/) &&
+                nextAppState === 'active'
+            ) {
+                await syncSystemData();
             }
+            appState.current = nextAppState;
         });
 
         return () => {
+            isMounted = false;
             subscription.remove();
         };
     }, []);
@@ -103,13 +122,6 @@ export default function HomeScreen() {
         return quests.filter((q) => q.type === activeTab);
     }, [quests, activeTab]);
 
-    if (isQuestsLoading || isPlayerLoading || !playerStats) {
-        return (
-            <View style={[styles.container, styles.centered]}>
-                <ActivityIndicator size="large" color={Colors.neonBlue} />
-            </View>
-        );
-    }
 
     const handleResolvePenalty = () => {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
@@ -129,6 +141,22 @@ export default function HomeScreen() {
             ]
         );
     };
+
+    if (!isAppReady || isQuestsLoading || isPlayerLoading) {
+        return (
+            <View style={[styles.container, styles.centered]}>
+                <ActivityIndicator size="large" color={Colors.neonBlue} />
+            </View>
+        );
+    }
+
+    if (!playerStats) {
+        return (
+            <View style={[styles.container, styles.centered]}>
+                <ActivityIndicator size="large" color={Colors.neonBlue} />
+            </View>
+        );
+    }
 
     return (
         <View style={styles.container}>
@@ -164,7 +192,18 @@ export default function HomeScreen() {
                         onToggleSubQuest={handleToggleSubQuest}
                     />
                 )}
-                contentContainerStyle={styles.listContent}
+                ListEmptyComponent={() => (
+                    <View style={styles.emptyContainer}>
+                        <Text style={styles.emptyTitle}>[ АКТИВНИХ ДИРЕКТИВ НЕ ВИЯВЛЕНО ]</Text>
+                        <Text style={styles.emptySubtitle}>
+                            Створіть завдання кнопкою «+» нижче для початку прогресії.
+                        </Text>
+                    </View>
+                )}
+                contentContainerStyle={[
+                    styles.listContent,
+                    filteredQuests.length === 0 && styles.emptyListContent,
+                ]}
                 showsVerticalScrollIndicator={false}
             />
 
@@ -190,5 +229,37 @@ const styles = StyleSheet.create({
     },
     listContent: {
         paddingBottom: 90,
+    },
+    loadingContainer: {
+        flex: 1,
+        backgroundColor: '#05070A',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    emptyListContent: {
+        flexGrow: 1,
+        justifyContent: 'center',
+    },
+    emptyContainer: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 32,
+        paddingVertical: 40,
+    },
+    emptyTitle: {
+        color: Colors.neonBlue,
+        fontFamily: 'monospace',
+        fontSize: 12,
+        fontWeight: '700',
+        letterSpacing: 1.2,
+        marginBottom: 6,
+        textAlign: 'center',
+    },
+    emptySubtitle: {
+        color: Colors.textMuted,
+        fontFamily: 'monospace',
+        fontSize: 11,
+        textAlign: 'center',
+        lineHeight: 16,
     },
 });

@@ -26,7 +26,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
             const stats = await fetchPlayerStatsFromDB();
             set({ playerStats: stats, isLoading: false });
         } catch (error) {
-            console.error('PlayerStore init error:', error);
+            console.error('[PLAYER_STORE ERROR]:', error);
             set({ isLoading: false });
         }
     },

@@ -341,7 +341,7 @@ export const registerPlayerDB = async (nickname: string, playerClass: string) =>
         `INSERT OR REPLACE INTO player_stats (
       id, nickname, player_class, level, rank, current_xp, max_xp, hp_percentage, streak_days, has_penalty, is_registered
     ) VALUES (
-      1, ?, ?, 1, 'E-Rank', 0, 1000, 100, 1, 0, 1
+      1, ?, ?, 1, 'E-Rank', 0, 1000, 100, 0, 0, 1
     );`,
         [nickname, playerClass]
     );
