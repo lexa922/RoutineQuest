@@ -327,11 +327,29 @@ export const fetchPlayerStatsFromDB = async (): Promise<PlayerStats> => {
     };
 };
 
-export const updatePlayerXpDB = async (newXp: number, level: number, maxXp: number) => {
+export const updatePlayerStatsDB = async (stats: PlayerStats) => {
     const db = await getDB();
+
     await db.runAsync(
-        'UPDATE player_stats SET current_xp = ?, level = ?, max_xp = ? WHERE id = 1;',
-        [newXp, level, maxXp]
+        `UPDATE player_stats 
+     SET 
+       current_xp = ?, 
+       level = ?, 
+       max_xp = ?, 
+       hp_percentage = ?, 
+       rank = ?,
+       streak_days = ?,
+       has_penalty = ?
+     WHERE id = 1;`,
+        [
+            stats.currentXp,
+            stats.level,
+            stats.maxXp,
+            stats.hpPercentage,
+            stats.rank,
+            stats.streakDays,
+            stats.hasPenalty ? 1 : 0,
+        ]
     );
 };
 

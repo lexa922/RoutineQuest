@@ -42,6 +42,18 @@ export default function HomeScreen() {
         visible: false,
         level: 1,
     });
+    const [promotionData, setPromotionData] = useState<{
+        visible: boolean;
+        level: number;
+        rank: string;
+        oldRank?: string;
+        isRankUp: boolean;
+    }>({
+        visible: false,
+        level: 1,
+        rank: 'E-Rank',
+        isRankUp: false,
+    });
 
     useEffect(() => {
         if (!isPlayerLoading && isAppReady) {
@@ -100,7 +112,13 @@ export default function HomeScreen() {
         if (result && result.xpDiff !== 0) {
             const xpResult = await applyXpChange(result.xpDiff);
             if (xpResult?.didLevelUp) {
-                setLevelUpData({ visible: true, level: xpResult.newLevel });
+                setPromotionData({
+                    visible: true,
+                    level: xpResult.newLevel,
+                    rank: xpResult.newRank,
+                    oldRank: xpResult.oldRank,
+                    isRankUp: xpResult.didRankUp,
+                });
             }
         }
     };
@@ -110,7 +128,13 @@ export default function HomeScreen() {
         if (result) {
             const xpResult = await applyXpChange(result.xpDiff);
             if (xpResult?.didLevelUp) {
-                setLevelUpData({ visible: true, level: xpResult.newLevel });
+                setPromotionData({
+                    visible: true,
+                    level: xpResult.newLevel,
+                    rank: xpResult.newRank,
+                    oldRank: xpResult.oldRank,
+                    isRankUp: xpResult.didRankUp,
+                });
             }
         }
     };
@@ -228,10 +252,12 @@ export default function HomeScreen() {
             />
 
             <LevelUpModal
-                visible={levelUpData.visible}
-                newLevel={levelUpData.level}
-                rank={playerStats.rank}
-                onClose={() => setLevelUpData((prev) => ({ ...prev, visible: false }))}
+                visible={promotionData.visible}
+                newLevel={promotionData.level}
+                rank={promotionData.rank}
+                oldRank={promotionData.oldRank}
+                isRankUp={promotionData.isRankUp}
+                onClose={() => setPromotionData((prev) => ({ ...prev, visible: false }))}
             />
         </View>
     );

@@ -11,43 +11,61 @@ import Animated, {
 import * as Haptics from 'expo-haptics';
 import { Colors } from '@/constants/theme';
 
-interface LevelUpModalProps {
+interface PromotionModalProps {
     visible: boolean;
     newLevel: number;
     rank: string;
+    oldRank?: string;
+    isRankUp?: boolean;
     onClose: () => void;
 }
 
-export const LevelUpModal: React.FC<LevelUpModalProps> = ({
-                                                              visible,
-                                                              newLevel,
-                                                              rank,
-                                                              onClose,
-                                                          }) => {
+export const LevelUpModal: React.FC<PromotionModalProps> = ({
+                                                                visible,
+                                                                newLevel,
+                                                                rank,
+                                                                oldRank,
+                                                                isRankUp = false,
+                                                                onClose,
+                                                            }) => {
     const scanScaleX = useSharedValue(0.05);
     const scanScaleY = useSharedValue(0.02);
     const hudOpacity = useSharedValue(0);
     const glitchOffset = useSharedValue(0);
 
+    const accentColor = isRankUp ? Colors.amberWarning : Colors.neonBlue;
+
     useEffect(() => {
         if (visible) {
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            if (isRankUp) {
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+                setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy), 150);
+                setTimeout(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success), 350);
+            } else {
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            }
 
-            hudOpacity.value = withTiming(1, { duration: 80 });
-
-            scanScaleX.value = withTiming(1, { duration: 160 });
-
-            scanScaleY.value = withDelay(140, withTiming(1, { duration: 180 }));
+            hudOpacity.value = withTiming(1, { duration: 60 });
+            scanScaleX.value = withTiming(1, { duration: 150 });
+            scanScaleY.value = withDelay(130, withTiming(1, { duration: 180 }));
 
             glitchOffset.value = withDelay(
-                320,
-                withSequence(
-                    withTiming(-8, { duration: 40 }),
-                    withTiming(8, { duration: 40 }),
-                    withTiming(-4, { duration: 30 }),
-                    withTiming(3, { duration: 30 }),
-                    withTiming(0, { duration: 40 })
-                )
+                300,
+                isRankUp
+                    ? withSequence(
+                        withTiming(-16, { duration: 35 }),
+                        withTiming(14, { duration: 35 }),
+                        withTiming(-10, { duration: 30 }),
+                        withTiming(8, { duration: 30 }),
+                        withTiming(-4, { duration: 25 }),
+                        withTiming(0, { duration: 30 })
+                    )
+                    : withSequence(
+                        withTiming(-8, { duration: 40 }),
+                        withTiming(8, { duration: 40 }),
+                        withTiming(-4, { duration: 30 }),
+                        withTiming(0, { duration: 40 })
+                    )
             );
         } else {
             scanScaleX.value = 0.05;
@@ -55,12 +73,12 @@ export const LevelUpModal: React.FC<LevelUpModalProps> = ({
             hudOpacity.value = 0;
             glitchOffset.value = 0;
         }
-    }, [visible]);
+    }, [visible, isRankUp]);
 
     const handleConfirm = () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-        scanScaleY.value = withTiming(0.02, { duration: 120 });
-        hudOpacity.value = withDelay(100, withTiming(0, { duration: 80 }, () => {
+        scanScaleY.value = withTiming(0.02, { duration: 100 });
+        hudOpacity.value = withDelay(80, withTiming(0, { duration: 60 }, () => {
             runOnJS(onClose)();
         }));
     };
@@ -79,31 +97,66 @@ export const LevelUpModal: React.FC<LevelUpModalProps> = ({
     return (
         <Modal transparent visible={visible} animationType="none">
             <View style={styles.backdrop}>
-                <Animated.View style={[styles.modalBox, animatedContainerStyle]}>
+                <Animated.View
+                    style={[
+                        styles.modalBox,
+                        { borderColor: accentColor, shadowColor: accentColor },
+                        animatedContainerStyle,
+                    ]}
+                >
                     <View style={styles.badgeHeader}>
-                        <View style={styles.statusDot} />
-                        <Text style={styles.systemTag}>SYSTEM NOTIFICATION</Text>
+                        <View style={[styles.statusDot, { backgroundColor: accentColor }]} />
+                        <Text style={[styles.systemTag, { color: accentColor }]}>
+                            {isRankUp ? 'CRITICAL SYSTEM PROMOTION' : 'SYSTEM NOTIFICATION'}
+                        </Text>
                     </View>
 
-                    <Text style={styles.title}>РІВЕНЬ ПІДВИЩЕНО</Text>
-                    <View style={styles.divider} />
-
-                    <View style={styles.levelContainer}>
-                        <Text style={styles.levelLabel}>ПОТОЧНИЙ РІВЕНЬ</Text>
-                        <Text style={styles.levelNumber}>LVL. {newLevel}</Text>
-                    </View>
-
-                    <View style={styles.rankRow}>
-                        <Text style={styles.rankLabel}>СТАТУС РАНГУ:</Text>
-                        <Text style={styles.rankValue}>[{rank}]</Text>
-                    </View>
-
-                    <Text style={styles.subtext}>
-                        Всі характеристики гравця оновлено. Отримано повне відновлення витривалості (HP).
+                    <Text style={styles.title}>
+                        {isRankUp ? 'РАНГ ПІДВИЩЕНО' : 'РІВЕНЬ ПІДВИЩЕНО'}
                     </Text>
 
-                    <Pressable style={styles.confirmBtn} onPress={handleConfirm}>
-                        <Text style={styles.confirmText}>[ ПРИЙНЯТИ ЗМІНИ ]</Text>
+                    <View style={[styles.divider, { backgroundColor: isRankUp ? 'rgba(255, 170, 0, 0.3)' : 'rgba(0, 240, 255, 0.3)' }]} />
+
+                    {isRankUp ? (
+                        <View style={styles.rankUpContainer}>
+                            <Text style={styles.rankSub}>КАТЕГОРІЯ МИСЛИВЦЯ ОНОВЛЕНА</Text>
+                            <View style={styles.rankTransitionRow}>
+                                <Text style={styles.oldRankText}>{oldRank || 'E-Rank'}</Text>
+                                <Text style={[styles.arrowText, { color: accentColor }]}>▶▶▶</Text>
+                                <Text style={[styles.newRankText, { color: accentColor }]}>{rank}</Text>
+                            </View>
+                            <Text style={styles.levelNotice}>[ СИНХРОНІЗОВАНО З LVL. {newLevel} ]</Text>
+                        </View>
+                    ) : (
+                        <View style={styles.levelContainer}>
+                            <Text style={styles.levelLabel}>ПОТОЧНИЙ РІВЕНЬ</Text>
+                            <Text style={[styles.levelNumber, { color: accentColor }]}>LVL. {newLevel}</Text>
+                            <View style={styles.rankRow}>
+                                <Text style={styles.rankLabel}>СТАТУС РАНГУ:</Text>
+                                <Text style={[styles.rankValue, { color: Colors.neonBlue }]}>[{rank}]</Text>
+                            </View>
+                        </View>
+                    )}
+
+                    <Text style={styles.subtext}>
+                        {isRankUp
+                            ? 'Авторитет мисливця в Системі зріс. Доступ до нових протоколів та максимальну витривалість відновлено.'
+                            : 'Всі характеристики гравця оновлено. Отримано повне відновлення витривалості (HP).'}
+                    </Text>
+
+                    <Pressable
+                        style={[
+                            styles.confirmBtn,
+                            {
+                                borderColor: accentColor,
+                                backgroundColor: isRankUp ? 'rgba(255, 170, 0, 0.12)' : Colors.neonBlueDim,
+                            },
+                        ]}
+                        onPress={handleConfirm}
+                    >
+                        <Text style={[styles.confirmText, { color: accentColor }]}>
+                            {isRankUp ? '[ ПРИЙНЯТИ НОВИЙ РАНГ ]' : '[ ПРИЙНЯТИ ЗМІНИ ]'}
+                        </Text>
                     </Pressable>
                 </Animated.View>
             </View>
@@ -114,24 +167,22 @@ export const LevelUpModal: React.FC<LevelUpModalProps> = ({
 const styles = StyleSheet.create({
     backdrop: {
         flex: 1,
-        backgroundColor: 'rgba(3, 5, 8, 0.88)',
+        backgroundColor: 'rgba(2, 4, 7, 0.92)',
         justifyContent: 'center',
         alignItems: 'center',
-        paddingHorizontal: 24,
+        paddingHorizontal: 20,
     },
     modalBox: {
         width: '100%',
         backgroundColor: '#070A10',
         borderWidth: 1.5,
-        borderColor: Colors.neonBlue,
+        borderLeftWidth: 4,
         padding: 24,
         borderRadius: 0,
-        borderLeftWidth: 4,
-        shadowColor: Colors.neonBlue,
         shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.85,
-        shadowRadius: 14,
-        elevation: 20,
+        shadowOpacity: 0.9,
+        shadowRadius: 18,
+        elevation: 22,
     },
     badgeHeader: {
         flexDirection: 'row',
@@ -143,12 +194,10 @@ const styles = StyleSheet.create({
     statusDot: {
         width: 6,
         height: 6,
-        backgroundColor: Colors.neonBlue,
     },
     systemTag: {
-        color: Colors.neonBlue,
         fontFamily: 'monospace',
-        fontSize: 11,
+        fontSize: 10,
         letterSpacing: 2,
         fontWeight: '800',
     },
@@ -162,12 +211,11 @@ const styles = StyleSheet.create({
     },
     divider: {
         height: 1,
-        backgroundColor: 'rgba(0, 240, 255, 0.25)',
         marginVertical: 14,
     },
     levelContainer: {
         alignItems: 'center',
-        marginVertical: 10,
+        marginVertical: 8,
     },
     levelLabel: {
         color: Colors.textMuted,
@@ -176,19 +224,18 @@ const styles = StyleSheet.create({
         letterSpacing: 1.5,
     },
     levelNumber: {
-        color: Colors.amberWarning,
-        fontSize: 42,
+        fontSize: 40,
         fontWeight: '900',
         fontFamily: 'monospace',
         letterSpacing: 2,
-        marginVertical: 4,
+        marginVertical: 2,
     },
     rankRow: {
         flexDirection: 'row',
         justifyContent: 'center',
         alignItems: 'center',
-        gap: 8,
-        marginBottom: 14,
+        gap: 6,
+        marginTop: 4,
     },
     rankLabel: {
         color: Colors.textMuted,
@@ -196,10 +243,48 @@ const styles = StyleSheet.create({
         fontSize: 11,
     },
     rankValue: {
-        color: Colors.neonBlue,
         fontFamily: 'monospace',
         fontSize: 12,
         fontWeight: '800',
+    },
+    rankUpContainer: {
+        alignItems: 'center',
+        marginVertical: 12,
+    },
+    rankSub: {
+        color: Colors.textMuted,
+        fontSize: 9,
+        fontFamily: 'monospace',
+        letterSpacing: 1.2,
+        marginBottom: 10,
+    },
+    rankTransitionRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+    },
+    oldRankText: {
+        color: Colors.textMuted,
+        fontFamily: 'monospace',
+        fontSize: 18,
+        textDecorationLine: 'line-through',
+    },
+    arrowText: {
+        fontFamily: 'monospace',
+        fontSize: 14,
+        fontWeight: '900',
+    },
+    newRankText: {
+        fontFamily: 'monospace',
+        fontSize: 26,
+        fontWeight: '900',
+        letterSpacing: 1.2,
+    },
+    levelNotice: {
+        color: Colors.textMuted,
+        fontFamily: 'monospace',
+        fontSize: 10,
+        marginTop: 8,
     },
     subtext: {
         color: Colors.textMuted,
@@ -207,18 +292,15 @@ const styles = StyleSheet.create({
         fontFamily: 'monospace',
         textAlign: 'center',
         lineHeight: 16,
-        marginBottom: 20,
+        marginVertical: 16,
     },
     confirmBtn: {
-        backgroundColor: Colors.neonBlueDim,
         borderWidth: 1,
-        borderColor: Colors.neonBlue,
         paddingVertical: 12,
         alignItems: 'center',
-        borderRadius: 2,
+        borderRadius: 0,
     },
     confirmText: {
-        color: Colors.neonBlue,
         fontFamily: 'monospace',
         fontSize: 12,
         fontWeight: '800',

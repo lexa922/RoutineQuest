@@ -4,8 +4,16 @@ import {
     clearPenaltyDB,
     fetchPlayerStatsFromDB,
     registerPlayerDB,
-    updatePlayerXpDB,
+    updatePlayerStatsDB,
 } from '@/db/client';
+
+export interface XpChangeResult {
+    didLevelUp: boolean;
+    didRankUp: boolean;
+    newLevel: number;
+    newRank: string;
+    oldRank: string;
+}
 
 interface PlayerState {
     playerStats: PlayerStats | null;
@@ -13,7 +21,7 @@ interface PlayerState {
 
     initPlayer: () => Promise<void>;
     registerPlayer: (nickname: string, playerClass: string) => Promise<void>;
-    applyXpChange: (xpDiff: number) => Promise<{ didLevelUp: boolean; newLevel: number } | null>;
+    applyXpChange: (xpDiff: number) => Promise<XpChangeResult | null>;
     clearPenalty: () => Promise<void>;
 }
 
@@ -60,19 +68,30 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
             currentXp = 0;
         }
 
+        const oldRank = playerStats.rank;
+        const newRank = calculateRank(level);
+        const didRankUp = didLevelUp && oldRank !== newRank;
+
         const updatedStats = {
             ...playerStats,
             currentXp,
             level,
             maxXp,
+            rank: newRank,
             hpPercentage: didLevelUp ? 100 : playerStats.hpPercentage,
         };
 
         set({ playerStats: updatedStats });
 
-        await updatePlayerXpDB(currentXp, level, maxXp);
+        await updatePlayerStatsDB(updatedStats);
 
-        return { didLevelUp, newLevel: level };
+        return {
+            didLevelUp,
+            didRankUp,
+            newLevel: level,
+            newRank,
+            oldRank,
+        };
     },
     clearPenalty: async () => {
         await clearPenaltyDB();
@@ -83,3 +102,11 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
         }));
     },
 }));
+export const calculateRank = (level: number): string => {
+    if (level >= 70) return 'S-Rank';
+    if (level >= 50) return 'A-Rank';
+    if (level >= 35) return 'B-Rank';
+    if (level >= 20) return 'C-Rank';
+    if (level >= 10) return 'D-Rank';
+    return 'E-Rank';
+};
