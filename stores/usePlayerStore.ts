@@ -13,7 +13,7 @@ interface PlayerState {
 
     initPlayer: () => Promise<void>;
     registerPlayer: (nickname: string, playerClass: string) => Promise<void>;
-    applyXpChange: (xpDiff: number) => Promise<void>;
+    applyXpChange: (xpDiff: number) => Promise<{ didLevelUp: boolean; newLevel: number } | null>;
     clearPenalty: () => Promise<void>;
 }
 
@@ -43,31 +43,36 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
 
     applyXpChange: async (xpDiff: number) => {
         const { playerStats } = get();
-        if (!playerStats) return;
+        if (!playerStats) return null;
 
-        let nextXp = playerStats.currentXp + xpDiff;
-        let nextLevel = playerStats.level;
-        let nextMaxXp = playerStats.maxXp;
+        let currentXp = playerStats.currentXp + xpDiff;
+        let level = playerStats.level;
+        let maxXp = playerStats.maxXp;
+        let didLevelUp = false;
 
-        if (nextXp >= nextMaxXp) {
-            nextXp -= nextMaxXp;
-            nextLevel += 1;
-            nextMaxXp = Math.round(nextMaxXp * 1.25);
-        } else if (nextXp < 0 && nextLevel > 1) {
-            nextLevel -= 1;
-            nextMaxXp = Math.round(nextMaxXp / 1.25);
-            nextXp = nextMaxXp + nextXp;
+        while (currentXp >= maxXp) {
+            currentXp -= maxXp;
+            level += 1;
+            maxXp = Math.floor(maxXp * 1.25);
+            didLevelUp = true;
+        }
+        if (currentXp < 0) {
+            currentXp = 0;
         }
 
-        const updated: PlayerStats = {
+        const updatedStats = {
             ...playerStats,
-            currentXp: Math.max(0, nextXp),
-            level: nextLevel,
-            maxXp: nextMaxXp,
+            currentXp,
+            level,
+            maxXp,
+            hpPercentage: didLevelUp ? 100 : playerStats.hpPercentage,
         };
 
-        set({ playerStats: updated });
-        await updatePlayerXpDB(updated.currentXp, updated.level, updated.maxXp);
+        set({ playerStats: updatedStats });
+
+        await updatePlayerXpDB(currentXp, level, maxXp);
+
+        return { didLevelUp, newLevel: level };
     },
     clearPenalty: async () => {
         await clearPenaltyDB();

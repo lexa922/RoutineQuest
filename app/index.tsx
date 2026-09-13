@@ -7,6 +7,8 @@ import { QuestCard } from '@/components/system/QuestCard';
 import { QuestFilterTabs } from '@/components/system/QuestFilterTabs';
 import { SystemActionFAB } from '@/components/system/SystemActionFAB';
 import { CreateQuestModal} from '@/components/system/CreateQuestModal';
+import { LevelUpModal } from '@/components/system/LevelUpModal';
+
 import * as Haptics from 'expo-haptics';
 
 import { useQuestStore } from '@/stores/useQuestStore';
@@ -36,6 +38,10 @@ export default function HomeScreen() {
     const clearPenalty = usePlayerStore((state) => state.clearPenalty);
 
     const [isModalVisible, setIsModalVisible] = useState(false);
+    const [levelUpData, setLevelUpData] = useState<{ visible: boolean; level: number }>({
+        visible: false,
+        level: 1,
+    });
 
     useEffect(() => {
         if (!isPlayerLoading && isAppReady) {
@@ -92,14 +98,20 @@ export default function HomeScreen() {
     const handleToggleQuest = async (id: string) => {
         const result = await toggleQuest(id);
         if (result && result.xpDiff !== 0) {
-            await applyXpChange(result.xpDiff);
+            const xpResult = await applyXpChange(result.xpDiff);
+            if (xpResult?.didLevelUp) {
+                setLevelUpData({ visible: true, level: xpResult.newLevel });
+            }
         }
     };
 
     const handleToggleSubQuest = async (questId: string, subQuestId: string) => {
         const result = await toggleSubQuest(questId, subQuestId);
         if (result) {
-            await applyXpChange(result.xpDiff);
+            const xpResult = await applyXpChange(result.xpDiff);
+            if (xpResult?.didLevelUp) {
+                setLevelUpData({ visible: true, level: xpResult.newLevel });
+            }
         }
     };
 
@@ -213,6 +225,13 @@ export default function HomeScreen() {
                 visible={isModalVisible}
                 onClose={() => setIsModalVisible(false)}
                 onSubmit={addQuest}
+            />
+
+            <LevelUpModal
+                visible={levelUpData.visible}
+                newLevel={levelUpData.level}
+                rank={playerStats.rank}
+                onClose={() => setLevelUpData((prev) => ({ ...prev, visible: false }))}
             />
         </View>
     );
