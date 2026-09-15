@@ -8,6 +8,9 @@ import { QuestFilterTabs } from '@/components/system/QuestFilterTabs';
 import { SystemActionFAB } from '@/components/system/SystemActionFAB';
 import { CreateQuestModal} from '@/components/system/CreateQuestModal';
 import { LevelUpModal } from '@/components/system/LevelUpModal';
+import { SystemChestModal } from '@/components/system/SystemChestModal';
+import { ChestBanner } from '@/components/system/ChestBanner';
+import { LootResult } from '@/types/loot';
 
 import * as Haptics from 'expo-haptics';
 
@@ -55,6 +58,12 @@ export default function HomeScreen() {
         isRankUp: false,
     });
 
+    const awardChest = usePlayerStore((state) => state.awardChest);
+    const claimNextChest = usePlayerStore((state) => state.claimNextChest);
+
+    const [currentLoot, setCurrentLoot] = useState<LootResult | null>(null);
+    const [isChestModalVisible, setIsChestModalVisible] = useState(false);
+
     useEffect(() => {
         if (!isPlayerLoading && isAppReady) {
             if (!playerStats || !playerStats.isRegistered) {
@@ -70,6 +79,14 @@ export default function HomeScreen() {
             await initQuests();
         } catch (error) {
             console.error('[SYSTEM SYNC ERROR]:', error);
+        }
+    };
+
+    const handleClaimChest = async () => {
+        const result = await claimNextChest();
+        if (result) {
+            setCurrentLoot(result);
+            setIsChestModalVisible(true);
         }
     };
 
@@ -119,6 +136,20 @@ export default function HomeScreen() {
                     oldRank: xpResult.oldRank,
                     isRankUp: xpResult.didRankUp,
                 });
+            }
+
+            if (result.updatedQuest.isCompleted) {
+                if (result.updatedQuest.type === 'main') {
+                    await awardChest('boss');
+                }
+                const currentDailies = quests.filter((q) => q.type === 'daily');
+                const allDailiesDone = currentDailies.every((q) =>
+                    q.id === id ? true : q.isCompleted
+                );
+
+                if (result.updatedQuest.type === 'daily' && allDailiesDone && currentDailies.length > 0) {
+                    await awardChest('daily');
+                }
             }
         }
     };
@@ -212,6 +243,11 @@ export default function HomeScreen() {
                 onResolvePenalty={handleResolvePenalty}
             />
 
+            <ChestBanner
+                chests={playerStats.pendingChests || []}
+                onOpen={handleClaimChest}
+            />
+
             <QuestFilterTabs
                 activeTab={activeTab}
                 onSelectTab={setActiveTab}
@@ -259,6 +295,12 @@ export default function HomeScreen() {
                 oldRank={promotionData.oldRank}
                 isRankUp={promotionData.isRankUp}
                 onClose={() => setPromotionData((prev) => ({ ...prev, visible: false }))}
+            />
+
+            <SystemChestModal
+                visible={isChestModalVisible}
+                loot={currentLoot}
+                onClose={() => setIsChestModalVisible(false)}
             />
         </View>
     );
