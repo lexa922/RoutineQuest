@@ -24,17 +24,3 @@ export interface Quest {
     lastCompletedAt?: string | null;
     subQuests?: SubQuest[];
 }
-
-export interface PlayerStats {
-    id?: number;
-    nickname: string;
-    playerClass: string;
-    level: number;
-    rank: string;
-    currentXp: number;
-    maxXp: number;
-    hpPercentage: number;
-    streakDays: number;
-    hasPenalty: boolean;
-    isRegistered?: boolean;
-}

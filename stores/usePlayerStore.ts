@@ -1,10 +1,18 @@
 import { create } from 'zustand';
-import { PlayerStats } from '@/types/quest';
+import { PlayerStats } from '@/types/player';
 import {
     clearPenaltyDB,
     fetchPlayerStatsFromDB,
     registerPlayerDB,
     updatePlayerStatsDB,
+} from '@/db/client';
+
+import { ChestType, LootResult, InventoryItem } from '@/types/loot';
+import { openChestReward } from '@/services/lootEngine';
+import {
+    updatePlayerLootStateDB,
+    saveItemToInventoryDB,
+    fetchInventoryFromDB
 } from '@/db/client';
 
 export interface XpChangeResult {
@@ -23,11 +31,16 @@ interface PlayerState {
     registerPlayer: (nickname: string, playerClass: string) => Promise<void>;
     applyXpChange: (xpDiff: number) => Promise<XpChangeResult | null>;
     clearPenalty: () => Promise<void>;
+    inventory: InventoryItem[];
+    loadInventory: () => Promise<void>;
+    awardChest: (chestType: ChestType) => Promise<void>;
+    claimNextChest: () => Promise<LootResult | null>;
 }
 
 export const usePlayerStore = create<PlayerState>((set, get) => ({
     playerStats: null,
     isLoading: true,
+    inventory: [],
 
     initPlayer: async () => {
         try {
@@ -100,6 +113,48 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
                 ? { ...state.playerStats, hasPenalty: false, hpPercentage: 100 }
                 : null,
         }));
+    },
+    loadInventory: async () => {
+        const items = await fetchInventoryFromDB();
+        set({ inventory: items });
+    },
+    awardChest: async (chestType: ChestType) => {
+        const { playerStats } = get();
+        if (!playerStats) return;
+
+        const updatedChests = [...playerStats.pendingChests, chestType];
+        const updatedStats = { ...playerStats, pendingChests: updatedChests };
+
+        set({ playerStats: updatedStats });
+        await updatePlayerLootStateDB(updatedStats.manaCrystals, updatedChests);
+    },
+
+    claimNextChest: async () => {
+        const { playerStats, loadInventory } = get();
+        if (!playerStats || playerStats.pendingChests.length === 0) return null;
+
+        const nextChestType = playerStats.pendingChests[0];
+        const remainingChests = playerStats.pendingChests.slice(1);
+
+        const loot = openChestReward(nextChestType);
+        const updatedCrystals = playerStats.manaCrystals + loot.manaCrystals;
+
+        const updatedStats = {
+            ...playerStats,
+            manaCrystals: updatedCrystals,
+            pendingChests: remainingChests,
+        };
+
+        set({ playerStats: updatedStats });
+
+        await updatePlayerLootStateDB(updatedCrystals, remainingChests);
+
+        if (loot.item) {
+            await saveItemToInventoryDB(loot.item);
+            await loadInventory();
+        }
+
+        return loot;
     },
 }));
 export const calculateRank = (level: number): string => {

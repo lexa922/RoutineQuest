@@ -1,5 +1,7 @@
 import * as SQLite from 'expo-sqlite';
-import {Quest, PlayerStats, SubQuest} from '@/types/quest';
+import {Quest, SubQuest} from '@/types/quest';
+import {PlayerStats} from '@/types/player'
+import { InventoryItem, ChestType } from '@/types/loot';
 
 const DB_NAME = 'routine_quest.db';
 
@@ -45,6 +47,18 @@ export const initDatabase = async () => {
     `);
 
     await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS inventory (
+           id TEXT PRIMARY KEY NOT NULL,
+           item_id TEXT NOT NULL UNIQUE,
+           name TEXT NOT NULL,
+           description TEXT NOT NULL,
+           rarity TEXT NOT NULL,
+           quantity INTEGER DEFAULT 1,
+           icon TEXT NOT NULL
+        );
+    `);
+
+    await db.execAsync(`
         CREATE TABLE IF NOT EXISTS player_stats (
             id INTEGER PRIMARY KEY CHECK (id = 1),
             nickname TEXT DEFAULT 'Hunter',
@@ -57,8 +71,10 @@ export const initDatabase = async () => {
             streak_days INTEGER DEFAULT 0,
             has_penalty INTEGER DEFAULT 0,
             is_registered INTEGER DEFAULT 0,
-            last_daily_reset TEXT DEFAULT ''
-        );
+            last_daily_reset TEXT DEFAULT '',
+            mana_crystals INTEGER DEFAULT 0,
+            pending_chests TEXT DEFAULT '[]'
+            );
     `);
 };
 
@@ -283,35 +299,10 @@ export const updateQuestCompletionDB = async (
     );
 };
 
-export const fetchPlayerStatsFromDB = async (): Promise<PlayerStats> => {
+export const fetchPlayerStatsFromDB = async (): Promise<PlayerStats | null> => {
     const db = await getDB();
-    const row = await db.getFirstAsync<{
-        nickname: string;
-        player_class: string;
-        level: number;
-        rank: string;
-        current_xp: number;
-        max_xp: number;
-        hp_percentage: number;
-        streak_days: number;
-        has_penalty: number;
-        is_registered: number;
-    }>('SELECT * FROM player_stats WHERE id = 1;');
-
-    if (!row) {
-        return {
-            nickname: 'Hunter',
-            playerClass: 'Novice',
-            level: 1,
-            rank: 'E-Rank',
-            currentXp: 0,
-            maxXp: 1000,
-            hpPercentage: 100,
-            streakDays: 0,
-            hasPenalty: false,
-            isRegistered: false,
-        };
-    }
+    const row = await db.getFirstAsync<any>('SELECT * FROM player_stats WHERE id = 1;');
+    if (!row) return null;
 
     return {
         nickname: row.nickname,
@@ -324,6 +315,9 @@ export const fetchPlayerStatsFromDB = async (): Promise<PlayerStats> => {
         streakDays: row.streak_days,
         hasPenalty: Boolean(row.has_penalty),
         isRegistered: Boolean(row.is_registered),
+        lastDailyReset: row.last_daily_reset,
+        manaCrystals: row.mana_crystals ?? 0,
+        pendingChests: row.pending_chests ? JSON.parse(row.pending_chests) : [],
     };
 };
 
@@ -377,4 +371,39 @@ export const clearPenaltyDB = async () => {
     SET has_penalty = 0, hp_percentage = 100 
     WHERE id = 1;
   `);
+};
+
+export const fetchInventoryFromDB = async (): Promise<InventoryItem[]> => {
+    const db = await getDB();
+    const rows = await db.getAllAsync<any>('SELECT * FROM inventory ORDER BY rarity DESC;');
+    return rows.map((r) => ({
+        id: r.id,
+        itemId: r.item_id,
+        name: r.name,
+        description: r.description,
+        rarity: r.rarity,
+        quantity: r.quantity,
+        icon: r.icon,
+    }));
+};
+
+export const saveItemToInventoryDB = async (item: InventoryItem) => {
+    const db = await getDB();
+    await db.runAsync(
+        `INSERT INTO inventory (id, item_id, name, description, rarity, quantity, icon)
+     VALUES (?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(item_id) DO UPDATE SET quantity = quantity + 1;`,
+        [item.id, item.itemId, item.name, item.description, item.rarity, item.quantity, item.icon]
+    );
+};
+
+export const updatePlayerLootStateDB = async (
+    manaCrystals: number,
+    pendingChests: ChestType[]
+) => {
+    const db = await getDB();
+    await db.runAsync(
+        'UPDATE player_stats SET mana_crystals = ?, pending_chests = ? WHERE id = 1;',
+        [manaCrystals, JSON.stringify(pendingChests)]
+    );
 };
