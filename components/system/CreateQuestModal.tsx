@@ -41,6 +41,7 @@ const QUEST_TYPES: { key: TabType; label: string }[] = [
     { key: 'daily', label: 'ЩОДЕННИЙ' },
     { key: 'main', label: 'ОСНОВНИЙ' },
     { key: 'regular', label: 'РЕГУЛЯРНИЙ' },
+    { key: 'side', label: 'САЙД-КВЕСТ' },
 ];
 
 const WEEKDAYS = [

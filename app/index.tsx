@@ -140,7 +140,7 @@ export default function HomeScreen() {
     };
 
     const counts = useMemo(() => {
-        const calc = (type: 'daily' | 'main' | 'regular') => {
+        const calc = (type: 'daily' | 'main' | 'regular'| 'side') => {
             const list = quests.filter((q) => q.type === type);
             return {
                 completed: list.filter((q) => q.isCompleted).length,
@@ -151,6 +151,7 @@ export default function HomeScreen() {
             daily: calc('daily'),
             main: calc('main'),
             regular: calc('regular'),
+            side: calc('side'),
         };
     }, [quests]);
 

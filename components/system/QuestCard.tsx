@@ -92,6 +92,13 @@ export const QuestCard: React.FC<QuestProps> = ({ quest, onToggle, onDelete, onT
                             {scheduleLabel && (
                                 <Text style={styles.cooldownText}>RESET: {scheduleLabel}</Text>
                             )}
+                            {quest.type === 'side' && (
+                                <Text style={styles.sideBadge}>// SPONTANEOUS DIRECTIVE</Text>
+                            )}
+
+                            {scheduleLabel && (
+                                <Text style={styles.cooldownText}>RESET: {scheduleLabel}</Text>
+                            )}
                         </View>
                         <Text
                             style={[styles.questTitle, quest.isCompleted && styles.completedTitle]}
@@ -274,5 +281,12 @@ const styles = StyleSheet.create({
         color: Colors.textMuted,
         fontSize: 13,
         fontWeight: 'bold',
+    },
+    sideBadge: {
+        color: '#A855F7',
+        fontSize: 9,
+        fontFamily: 'monospace',
+        fontWeight: '700',
+        letterSpacing: 0.8,
     },
 });

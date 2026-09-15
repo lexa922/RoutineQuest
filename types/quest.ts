@@ -1,5 +1,5 @@
 export type QuestCategory = 'STR' | 'INT' | 'MND';
-export type TabType = 'daily' | 'main' | 'regular';
+export type TabType = 'daily' | 'main' | 'regular'| 'side';
 export type RepeatType = 'interval' | 'weekdays';
 
 export interface SubQuest {

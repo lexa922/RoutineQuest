@@ -3,7 +3,7 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Colors } from '@/constants/theme';
 
-export type TabType = 'daily' | 'main' | 'regular';
+export type TabType = 'daily' | 'main' | 'regular'|'side';
 
 interface Props {
     activeTab: TabType;
@@ -12,6 +12,7 @@ interface Props {
         daily: { completed: number; total: number };
         main: { completed: number; total: number };
         regular: { completed: number; total: number };
+        side: { completed: number; total: number };
     };
 }
 
@@ -20,6 +21,7 @@ export const QuestFilterTabs: React.FC<Props> = ({ activeTab, onSelectTab, count
         { key: 'daily', label: 'ЩОДЕННІ', count: counts.daily },
         { key: 'main', label: 'ОСНОВНІ', count: counts.main },
         { key: 'regular', label: 'РЕГУЛЯРНІ', count: counts.regular },
+        { key: 'side', label: 'ПОБІЧНІ', count: counts.side },
     ];
 
     const handlePress = (key: TabType) => {
