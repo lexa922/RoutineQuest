@@ -22,6 +22,7 @@ interface PlayerStatusProps {
     streakDays: number;
     hasPenalty: boolean;
     onResolvePenalty?: () => void;
+    onOpenInventory: () => void;
 }
 
 export const PlayerStatusHeader: React.FC<PlayerStatusProps> = ({
@@ -35,6 +36,7 @@ export const PlayerStatusHeader: React.FC<PlayerStatusProps> = ({
     streakDays,
     hasPenalty,
     onResolvePenalty,
+    onOpenInventory,
     }) => {
     const xpWidth = useSharedValue(0);
 
@@ -87,7 +89,12 @@ export const PlayerStatusHeader: React.FC<PlayerStatusProps> = ({
                     <Text style={styles.callsignPrefix}>OPERATOR // </Text>
                     <Text style={styles.nicknameText}>{nickname.toUpperCase()}</Text>
                 </View>
-                <Text style={styles.classBadge}>[{playerClass.toUpperCase()}]</Text>
+                <View style={styles.identityRightGroup}>
+                    <Text style={styles.classBadge}>[{playerClass.toUpperCase()}]</Text>
+                    <Pressable style={styles.vaultTriggerCompact} onPress={onOpenInventory}>
+                        <Text style={styles.vaultBtnText}>[ VAULT ]</Text>
+                    </Pressable>
+                </View>
             </View>
 
             <View style={styles.topRow}>
@@ -340,5 +347,35 @@ const styles = StyleSheet.create({
         fontSize: 9,
         fontFamily: 'monospace',
         fontWeight: '700',
+    },
+    vaultTriggerBtn: {
+        borderWidth: 1,
+        borderColor: Colors.neonBlue,
+        backgroundColor: 'rgba(0, 240, 255, 0.08)',
+        paddingVertical: 5,
+        paddingHorizontal: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 8,
+        alignSelf: 'flex-start',
+    },
+    vaultBtnText: {
+        color: Colors.neonBlue,
+        fontFamily: 'monospace',
+        fontSize: 10,
+        fontWeight: '800',
+        letterSpacing: 1.2,
+    },
+    identityRightGroup: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    vaultTriggerCompact: {
+        borderWidth: 1,
+        borderColor: Colors.neonBlue,
+        backgroundColor: 'rgba(0, 240, 255, 0.08)',
+        paddingVertical: 2,
+        paddingHorizontal: 6,
     },
 });

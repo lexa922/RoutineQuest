@@ -10,6 +10,8 @@ import { CreateQuestModal} from '@/components/system/CreateQuestModal';
 import { LevelUpModal } from '@/components/system/LevelUpModal';
 import { SystemChestModal } from '@/components/system/SystemChestModal';
 import { ChestBanner } from '@/components/system/ChestBanner';
+import { InventoryModal } from '@/components/system/InventoryModal';
+
 import { LootResult } from '@/types/loot';
 
 import * as Haptics from 'expo-haptics';
@@ -39,8 +41,13 @@ export default function HomeScreen() {
     const initPlayer = usePlayerStore((state) => state.initPlayer);
     const applyXpChange = usePlayerStore((state) => state.applyXpChange);
     const clearPenalty = usePlayerStore((state) => state.clearPenalty);
+    const awardChest = usePlayerStore((state) => state.awardChest);
+    const claimNextChest = usePlayerStore((state) => state.claimNextChest);
+    const inventory = usePlayerStore((state) => state.inventory);
+    const loadInventory = usePlayerStore((state) => state.loadInventory);
 
     const [isModalVisible, setIsModalVisible] = useState(false);
+    const [isInventoryVisible, setIsInventoryVisible] = useState(false);
     const [levelUpData, setLevelUpData] = useState<{ visible: boolean; level: number }>({
         visible: false,
         level: 1,
@@ -58,11 +65,12 @@ export default function HomeScreen() {
         isRankUp: false,
     });
 
-    const awardChest = usePlayerStore((state) => state.awardChest);
-    const claimNextChest = usePlayerStore((state) => state.claimNextChest);
-
     const [currentLoot, setCurrentLoot] = useState<LootResult | null>(null);
     const [isChestModalVisible, setIsChestModalVisible] = useState(false);
+
+    useEffect(() => {
+        loadInventory();
+    }, []);
 
     useEffect(() => {
         if (!isPlayerLoading && isAppReady) {
@@ -264,6 +272,7 @@ export default function HomeScreen() {
                 streakDays={playerStats.streakDays}
                 hasPenalty={playerStats.hasPenalty}
                 onResolvePenalty={handleResolvePenalty}
+                onOpenInventory={() => setIsInventoryVisible(true)}
             />
 
             <ChestBanner
@@ -324,6 +333,16 @@ export default function HomeScreen() {
                 visible={isChestModalVisible}
                 loot={currentLoot}
                 onClose={() => setIsChestModalVisible(false)}
+            />
+
+            <InventoryModal
+                visible={isInventoryVisible}
+                manaCrystals={playerStats.manaCrystals || 0}
+                items={inventory}
+                onClose={() => setIsInventoryVisible(false)}
+                onUseItem={(item) => {
+                    console.log('Use item:', item.itemId);
+                }}
             />
         </View>
     );
