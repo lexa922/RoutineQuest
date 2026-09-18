@@ -24,4 +24,5 @@ export interface Quest {
     repeatWeekdays?: number[];
     lastCompletedAt?: string | null;
     subQuests?: SubQuest[];
+    isBoosted?: boolean;
 }

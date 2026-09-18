@@ -14,7 +14,11 @@ export const getDB = async (): Promise<SQLite.SQLiteDatabase> => {
     return dbInstance;
 };
 
+let initExecuted = false;
+
 export const initDatabase = async () => {
+    if (initExecuted) return;
+
     const db = await getDB();
 
     await db.execAsync('PRAGMA journal_mode = WAL;');
@@ -32,7 +36,8 @@ export const initDatabase = async () => {
             repeat_interval_days INTEGER,
             repeat_weekdays TEXT,
             last_completed_at TEXT,
-            reward_claimed INTEGER DEFAULT 0
+            reward_claimed INTEGER DEFAULT 0,
+            is_boosted INTEGER DEFAULT 0
         );
     `);
 
@@ -75,7 +80,9 @@ export const initDatabase = async () => {
             last_daily_reset TEXT DEFAULT '',
             mana_crystals INTEGER DEFAULT 0,
             pending_chests TEXT DEFAULT '[]',
-            last_daily_chest_claimed TEXT DEFAULT ''
+            last_daily_chest_claimed TEXT DEFAULT '',
+            xp_boost_until TEXT DEFAULT '',
+            is_streak_frozen INTEGER DEFAULT 0
         );
     `);
 };
@@ -124,7 +131,6 @@ export const checkAndResetDailiesDB = async (): Promise<boolean> => {
     } else if (completedDailies.length > 0) {
         newStreak += 1;
     }
-
 
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
@@ -239,6 +245,7 @@ export const fetchQuestsFromDB = async (): Promise<Quest[]> => {
             lastCompletedAt: r.last_completed_at,
             rewardClaimed: Boolean(r.reward_claimed),
             subQuests: subs,
+            isBoosted: Boolean(r.is_boosted)
         };
     });
 };
@@ -322,6 +329,8 @@ export const fetchPlayerStatsFromDB = async (): Promise<PlayerStats | null> => {
         lastDailyChestClaimed: row.last_daily_chest_claimed || '',
         manaCrystals: row.mana_crystals ?? 0,
         pendingChests: row.pending_chests ? JSON.parse(row.pending_chests) : [],
+        xpBoostUntil: row.xp_boost_until || '',
+        isStreakFrozen: Boolean(row.is_streak_frozen),
     };
 };
 
@@ -420,4 +429,46 @@ export const markQuestRewardClaimedDB = async (questId: string) => {
 export const updateDailyChestClaimDateDB = async (dateStr: string) => {
     const db = await getDB();
     await db.runAsync('UPDATE player_stats SET last_daily_chest_claimed = ? WHERE id = 1;', [dateStr]);
+};
+
+export const consumeInventoryItemDB = async (itemId: string) => {
+    const db = await getDB();
+    const row = await db.getFirstAsync<any>(
+        'SELECT quantity FROM inventory WHERE item_id = ?;',
+        [itemId]
+    );
+
+    if (!row) return;
+
+    if (row.quantity > 1) {
+        await db.runAsync(
+            'UPDATE inventory SET quantity = quantity - 1 WHERE item_id = ?;',
+            [itemId]
+        );
+    } else {
+        await db.runAsync('DELETE FROM inventory WHERE item_id = ?;', [itemId]);
+    }
+};
+
+export const updatePlayerBuffsDB = async (
+    xpBoostUntil: string,
+    isStreakFrozen: boolean,
+    hasPenalty: boolean
+) => {
+    const db = await getDB();
+    await db.runAsync(
+        `UPDATE player_stats 
+     SET xp_boost_until = ?, is_streak_frozen = ?, has_penalty = ? 
+     WHERE id = 1;`,
+        [xpBoostUntil, isStreakFrozen ? 1 : 0, hasPenalty ? 1 : 0]
+    );
+};
+
+export const applyMirrorBoostDB = async (questId: string) => {
+    const db = await getDB();
+    await db.runAsync('UPDATE quests SET is_boosted = 1 WHERE id = ?;', [questId]);
+    await db.runAsync(
+        'UPDATE sub_quests SET xp_reward = xp_reward * 2 WHERE quest_id = ? AND is_completed = 0;',
+        [questId]
+    );
 };

@@ -5,6 +5,8 @@ import {
     fetchPlayerStatsFromDB,
     registerPlayerDB,
     updatePlayerStatsDB,
+    consumeInventoryItemDB,
+    updatePlayerBuffsDB
 } from '@/db/client';
 
 import { ChestType, LootResult, InventoryItem } from '@/types/loot';
@@ -35,6 +37,7 @@ interface PlayerState {
     loadInventory: () => Promise<void>;
     awardChest: (chestType: ChestType) => Promise<void>;
     claimNextChest: () => Promise<LootResult | null>;
+    useInventoryItem: (item: InventoryItem) => Promise<{ success: boolean; message: string }>;
 }
 
 export const usePlayerStore = create<PlayerState>((set, get) => ({
@@ -66,10 +69,19 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
         const { playerStats } = get();
         if (!playerStats) return null;
 
-        let currentXp = playerStats.currentXp + xpDiff;
+        let effectiveXpDiff = xpDiff;
+
+        let currentXp = playerStats.currentXp + effectiveXpDiff;
         let level = playerStats.level;
         let maxXp = playerStats.maxXp;
         let didLevelUp = false;
+
+        if (xpDiff > 0 && playerStats.xpBoostUntil) {
+            const expiresAt = new Date(playerStats.xpBoostUntil).getTime();
+            if (Date.now() < expiresAt) {
+                effectiveXpDiff = Math.round(xpDiff * 1.5);
+            }
+        }
 
         while (currentXp >= maxXp) {
             currentXp -= maxXp;
@@ -156,7 +168,57 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
 
         return loot;
     },
+    useInventoryItem: async (item: InventoryItem) => {
+        const { playerStats, loadInventory } = get();
+        if (!playerStats) return { success: false, message: 'ПОМИЛКА СИНХРОНІЗАЦІЇ' };
+
+        let message = '';
+        let updatedStats = { ...playerStats };
+
+        switch (item.itemId) {
+            case 'purification_stone': {
+                if (!playerStats.hasPenalty) {
+                    return { success: false, message: 'НЕМАЄ АКТИВНОГО ШТРАФУ' };
+                }
+                updatedStats.hasPenalty = false;
+                message = 'ШТРАФНИЙ СТАТУС АНУЛЬОВАНО';
+                break;
+            }
+
+            case 'overload_elixir': {
+                const durationMs = 3 * 60 * 60 * 1000;
+                const boostUntil = new Date(Date.now() + durationMs).toISOString();
+                updatedStats.xpBoostUntil = boostUntil;
+                message = 'АКТИВОВАНО БУСТ XP +50% НА 3 ГОДИНИ';
+                break;
+            }
+
+            case 'monarch_hourglass': {
+                if (playerStats.isStreakFrozen) {
+                    return { success: false, message: 'СТРІК ВЖЕ ПІД ЗАХИСТОМ' };
+                }
+                updatedStats.isStreakFrozen = true;
+                message = 'СТРІК ЗАМОРОЖЕНО НА 24 ГОДИНИ';
+                break;
+            }
+
+            default:
+                return { success: false, message: 'НЕВІДОМИЙ ТИП АРТЕФАКТУ' };
+        }
+
+        set({ playerStats: updatedStats });
+        await updatePlayerBuffsDB(
+            updatedStats.xpBoostUntil || '',
+            Boolean(updatedStats.isStreakFrozen),
+            updatedStats.hasPenalty
+        );
+        await consumeInventoryItemDB(item.itemId);
+        await loadInventory();
+
+        return { success: true, message };
+    },
 }));
+
 export const calculateRank = (level: number): string => {
     if (level >= 70) return 'S-Rank';
     if (level >= 50) return 'A-Rank';

@@ -12,14 +12,21 @@ import { SystemChestModal } from '@/components/system/SystemChestModal';
 import { ChestBanner } from '@/components/system/ChestBanner';
 import { InventoryModal } from '@/components/system/InventoryModal';
 
-import { LootResult } from '@/types/loot';
+import {InventoryItem, LootResult} from '@/types/loot';
 
 import * as Haptics from 'expo-haptics';
 
 import { useQuestStore } from '@/stores/useQuestStore';
 import { usePlayerStore } from '@/stores/usePlayerStore';
 
-import {checkAndResetDailiesDB, initDatabase, markQuestRewardClaimedDB, updateDailyChestClaimDateDB} from '@/db/client';
+import {
+    checkAndResetDailiesDB,
+    consumeInventoryItemDB,
+    initDatabase,
+    markQuestRewardClaimedDB,
+    updateDailyChestClaimDateDB,
+    applyMirrorBoostDB,
+} from '@/db/client';
 
 export default function HomeScreen() {
     const router = useRouter();
@@ -45,6 +52,7 @@ export default function HomeScreen() {
     const claimNextChest = usePlayerStore((state) => state.claimNextChest);
     const inventory = usePlayerStore((state) => state.inventory);
     const loadInventory = usePlayerStore((state) => state.loadInventory);
+    const useItem = usePlayerStore((state) => state.useInventoryItem);
 
     const [isModalVisible, setIsModalVisible] = useState(false);
     const [isInventoryVisible, setIsInventoryVisible] = useState(false);
@@ -69,10 +77,6 @@ export default function HomeScreen() {
     const [isChestModalVisible, setIsChestModalVisible] = useState(false);
 
     useEffect(() => {
-        loadInventory();
-    }, []);
-
-    useEffect(() => {
         if (!isPlayerLoading && isAppReady) {
             if (!playerStats || !playerStats.isRegistered) {
                 router.replace('/register');
@@ -85,6 +89,7 @@ export default function HomeScreen() {
             await checkAndResetDailiesDB();
             await initPlayer();
             await initQuests();
+            await loadInventory();
         } catch (error) {
             console.error('[SYSTEM SYNC ERROR]:', error);
         }
@@ -241,6 +246,47 @@ export default function HomeScreen() {
         );
     };
 
+    const handleUseItem = async (item: InventoryItem) => {
+        if (item.itemId === 'shadow_pass') {
+            const uncompletedDaily = quests.find(
+                (q) => q.type === 'daily' && !q.isCompleted
+            );
+
+            if (!uncompletedDaily) {
+                alert('Усі щоденні директиви вже виконано!');
+                return;
+            }
+
+            await handleToggleQuest(uncompletedDaily.id);
+            await consumeInventoryItemDB(item.itemId);
+            await usePlayerStore.getState().loadInventory();
+            return;
+        }
+
+        if (item.itemId === 'expansion_mirror') {
+            const targetMainQuest = quests.find(
+                (q) => q.type === 'main' && !q.isCompleted && !q.isBoosted
+            );
+
+            if (!targetMainQuest) {
+                alert('Не знайдено активного Main Quest без активного дзеркала!');
+                return;
+            }
+
+            await applyMirrorBoostDB(targetMainQuest.id);
+            await consumeInventoryItemDB(item.itemId);
+            await usePlayerStore.getState().loadInventory();
+            await useQuestStore.getState().initQuests();
+            alert(`[СИСТЕМА]: Дзеркало активовано для квесту "${targetMainQuest.title}". Нагороди підквестів подвоєно!`);
+            return;
+        }
+
+        const res = await useItem(item);
+        if (!res.success) {
+            alert(res.message);
+        }
+    };
+
     if (!isAppReady || isQuestsLoading || isPlayerLoading) {
         return (
             <View style={[styles.container, styles.centered]}>
@@ -340,9 +386,7 @@ export default function HomeScreen() {
                 manaCrystals={playerStats.manaCrystals || 0}
                 items={inventory}
                 onClose={() => setIsInventoryVisible(false)}
-                onUseItem={(item) => {
-                    console.log('Use item:', item.itemId);
-                }}
+                onUseItem={handleUseItem}
             />
         </View>
     );

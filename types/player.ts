@@ -16,4 +16,6 @@ export interface PlayerStats {
     lastDailyChestClaimed?: string;
     manaCrystals: number;
     pendingChests: ChestType[];
+    xpBoostUntil?: string;
+    isStreakFrozen?: boolean;
 }
