@@ -17,7 +17,7 @@ import * as Haptics from 'expo-haptics';
 import { useQuestStore } from '@/stores/useQuestStore';
 import { usePlayerStore } from '@/stores/usePlayerStore';
 
-import {checkAndResetDailiesDB, initDatabase} from '@/db/client';
+import {checkAndResetDailiesDB, initDatabase, markQuestRewardClaimedDB, updateDailyChestClaimDateDB} from '@/db/client';
 
 export default function HomeScreen() {
     const router = useRouter();
@@ -126,30 +126,53 @@ export default function HomeScreen() {
 
     const handleToggleQuest = async (id: string) => {
         const result = await toggleQuest(id);
-        if (result && result.xpDiff !== 0) {
-            const xpResult = await applyXpChange(result.xpDiff);
-            if (xpResult?.didLevelUp) {
-                setPromotionData({
-                    visible: true,
-                    level: xpResult.newLevel,
-                    rank: xpResult.newRank,
-                    oldRank: xpResult.oldRank,
-                    isRankUp: xpResult.didRankUp,
-                });
+        if (!result || result.xpDiff === 0) return;
+
+        const xpResult = await applyXpChange(result.xpDiff);
+        if (xpResult?.didLevelUp) {
+            setPromotionData({
+                visible: true,
+                level: xpResult.newLevel,
+                rank: xpResult.newRank,
+                oldRank: xpResult.oldRank,
+                isRankUp: xpResult.didRankUp,
+            });
+        }
+
+        if (result.updatedQuest.isCompleted) {
+            const today = new Date().toISOString().split('T')[0];
+
+            if (result.updatedQuest.type === 'main' && !result.updatedQuest.rewardClaimed) {
+                await markQuestRewardClaimedDB(result.updatedQuest.id);
+                useQuestStore.setState((state) => ({
+                    quests: state.quests.map((q) =>
+                        q.id === id ? { ...q, rewardClaimed: true } : q
+                    ),
+                }));
+                await awardChest('boss');
             }
 
-            if (result.updatedQuest.isCompleted) {
-                if (result.updatedQuest.type === 'main') {
-                    await awardChest('boss');
-                }
-                const currentDailies = quests.filter((q) => q.type === 'daily');
-                const allDailiesDone = currentDailies.every((q) =>
-                    q.id === id ? true : q.isCompleted
-                );
+            const currentDailies = quests.filter((q) => q.type === 'daily');
+            const allDailiesDone = currentDailies.every((q) =>
+                q.id === id ? true : q.isCompleted
+            );
 
-                if (result.updatedQuest.type === 'daily' && allDailiesDone && currentDailies.length > 0) {
-                    await awardChest('daily');
-                }
+            // @ts-ignore
+            const alreadyClaimedToday = playerStats.lastDailyChestClaimed === today;
+
+            if (
+                result.updatedQuest.type === 'daily' &&
+                allDailiesDone &&
+                currentDailies.length > 0 &&
+                !alreadyClaimedToday
+            ) {
+                await updateDailyChestClaimDateDB(today);
+                usePlayerStore.setState((state) => ({
+                    playerStats: state.playerStats
+                        ? { ...state.playerStats, lastDailyChestClaimed: today }
+                        : null,
+                }));
+                await awardChest('daily');
             }
         }
     };

@@ -13,6 +13,7 @@ export interface PlayerStats {
     hasPenalty: boolean;
     isRegistered?: boolean;
     lastDailyReset?: string;
+    lastDailyChestClaimed?: string;
     manaCrystals: number;
     pendingChests: ChestType[];
 }

@@ -17,6 +17,7 @@ export interface Quest {
     type: TabType;
     xpReward: number;
     isCompleted: boolean;
+    rewardClaimed?: boolean;
     createdAt: string;
     repeatType?: RepeatType;
     repeatIntervalDays?: number;

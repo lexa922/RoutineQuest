@@ -31,7 +31,8 @@ export const initDatabase = async () => {
             repeat_type TEXT,
             repeat_interval_days INTEGER,
             repeat_weekdays TEXT,
-            last_completed_at TEXT
+            last_completed_at TEXT,
+            reward_claimed INTEGER DEFAULT 0
         );
     `);
 
@@ -73,8 +74,9 @@ export const initDatabase = async () => {
             is_registered INTEGER DEFAULT 0,
             last_daily_reset TEXT DEFAULT '',
             mana_crystals INTEGER DEFAULT 0,
-            pending_chests TEXT DEFAULT '[]'
-            );
+            pending_chests TEXT DEFAULT '[]',
+            last_daily_chest_claimed TEXT DEFAULT ''
+        );
     `);
 };
 
@@ -235,6 +237,7 @@ export const fetchQuestsFromDB = async (): Promise<Quest[]> => {
             repeatIntervalDays: r.repeat_interval_days ?? undefined,
             repeatWeekdays: r.repeat_weekdays ? JSON.parse(r.repeat_weekdays) : undefined,
             lastCompletedAt: r.last_completed_at,
+            rewardClaimed: Boolean(r.reward_claimed),
             subQuests: subs,
         };
     });
@@ -316,6 +319,7 @@ export const fetchPlayerStatsFromDB = async (): Promise<PlayerStats | null> => {
         hasPenalty: Boolean(row.has_penalty),
         isRegistered: Boolean(row.is_registered),
         lastDailyReset: row.last_daily_reset,
+        lastDailyChestClaimed: row.last_daily_chest_claimed || '',
         manaCrystals: row.mana_crystals ?? 0,
         pendingChests: row.pending_chests ? JSON.parse(row.pending_chests) : [],
     };
@@ -406,4 +410,14 @@ export const updatePlayerLootStateDB = async (
         'UPDATE player_stats SET mana_crystals = ?, pending_chests = ? WHERE id = 1;',
         [manaCrystals, JSON.stringify(pendingChests)]
     );
+};
+
+export const markQuestRewardClaimedDB = async (questId: string) => {
+    const db = await getDB();
+    await db.runAsync('UPDATE quests SET reward_claimed = 1 WHERE id = 1;', [questId]);
+};
+
+export const updateDailyChestClaimDateDB = async (dateStr: string) => {
+    const db = await getDB();
+    await db.runAsync('UPDATE player_stats SET last_daily_chest_claimed = ? WHERE id = 1;', [dateStr]);
 };
